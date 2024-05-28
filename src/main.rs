@@ -11,5 +11,5 @@ mod workflow;
 fn main() {
   let args = cli::get_cli_args();
   let workflow = CoopWorkflow::new(args);
-  ()
+  workflow.run()
 }
