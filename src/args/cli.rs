@@ -24,10 +24,14 @@ pub struct Args {
    pub concurrency: u8,
 
    /// Files to ignore during copy.
+   ///
    /// Can be specified multiple times.
    /// Accepts a regular expression which filters the file path from the current directory.
+   ///
    /// Example: --ignore '.git'
-   #[arg(short,long)]
+   ///
+   /// Note: When ignores are supplied the defaults are not used.
+   #[arg(short,long, default_values=[".DS_Store", ".git", "/target"])]
    pub ignore: Vec<Regex>,
 }
 
