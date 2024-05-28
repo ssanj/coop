@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use regex::Regex;
 
 use clap::Parser;
 
@@ -21,6 +22,13 @@ pub struct Args {
    /// The maximum number of file copies to perform concurrently
    #[arg(short,long, default_value="4")]
    pub concurrency: u8,
+
+   /// Files to ignore during copy.
+   /// Can be specified multiple times.
+   /// Accepts a regular expression which filters the file path from the current directory.
+   /// Example: --ignore '.git'
+   #[arg(short,long)]
+   pub ignore: Vec<Regex>,
 }
 
 pub fn get_cli_args() -> Args {

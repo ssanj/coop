@@ -230,6 +230,7 @@ dependencies = [
  "once_cell",
  "predicates",
  "pretty_assertions",
+ "regex",
  "serde",
  "serde_json",
  "similar",
