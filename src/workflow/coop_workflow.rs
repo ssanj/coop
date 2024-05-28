@@ -30,7 +30,13 @@ impl CoopWorkflow {
               // We might want to filter out certain files like .DS_Store
               d.file_type().is_file()
             })
-            .map(|f| f.file_name().to_string_lossy().to_string() )
+            .and_then(|f| {
+              f
+                .path()
+                .strip_prefix(source_dir)
+                .ok()
+                .map(|f1| f1.to_string_lossy().to_string() )
+            })
         })
         .collect();
 
