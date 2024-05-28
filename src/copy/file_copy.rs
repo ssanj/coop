@@ -8,7 +8,7 @@ use crate::progress::MyProgressBar;
 use crate::model::{Complete, FailedReason, FileStatus, FileType, InProgress, R};
 
 #[derive(Debug, Clone)]
-struct FileCopy {
+pub struct FileCopy {
   source_file_path: PathBuf,
   destination_dir_path: PathBuf,
   progress_bar: MyProgressBar,
@@ -16,7 +16,7 @@ struct FileCopy {
 
 impl FileCopy {
 
-  pub fn new<T: AsRef<Path>>(source_file_path: T, destination_dir_path: T, multi: &MultiProgress) -> Self {
+  pub fn new<S: AsRef<Path>, D: AsRef<Path>>(source_file_path: S, destination_dir_path: D, multi: &MultiProgress) -> Self {
     let source_file = source_file_path.as_ref().to_path_buf();
     let destination_dir = destination_dir_path.as_ref().to_path_buf();
 

@@ -5,7 +5,7 @@ pub struct FileCopyProgressMonitor;
 
 impl FileCopyProgressMonitor {
 
-   async fn monitor(mut rx: Receiver<FileStatus>) -> R<()> {
+   pub async fn monitor(mut rx: Receiver<FileStatus>) -> R<()> {
       while let Some(value) = rx.recv().await {
         match value {
           FileStatus::NotStarted(pb) => pb.set_status("waiting..."),
