@@ -1,3 +1,3 @@
 # Coop
 
-Making progress on your network file copy
+Visualise progress on your network file copy
