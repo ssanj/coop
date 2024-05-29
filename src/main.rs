@@ -7,6 +7,7 @@ mod progress;
 mod monitor;
 mod copy;
 mod workflow;
+mod console;
 
 #[tokio::main]
 async fn main() {

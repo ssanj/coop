@@ -6,6 +6,7 @@ use tokio::sync::mpsc::{self};
 use tokio::task::JoinSet;
 
 use crate::cli::Args;
+use crate::console::{CoopConsole, UserResult};
 use crate::copy::{FileCopy, SourceFile};
 use crate::model::FileStatus;
 use crate::monitor::FileCopyProgressMonitor;
@@ -32,6 +33,12 @@ impl CoopWorkflow {
     let concurrency = args.concurrency as u16;
 
     let files_to_copy = SourceFile::get_source_files(source_dir, ignored_regexes);
+    let selection = CoopConsole::show_copy_state(&files_to_copy, concurrency, destination_dir.to_str().unwrap_or("<Unknown>"));
+
+    let _ = match selection {
+      UserResult::Continue => (),
+      _ => return
+    };
 
     let copy_tasks: Vec<_> =
       files_to_copy
