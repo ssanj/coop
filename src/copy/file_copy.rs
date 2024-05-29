@@ -7,34 +7,35 @@ use tokio::sync::mpsc::Sender;
 use crate::progress::MyProgressBar;
 use crate::model::{Complete, FailedReason, FileStatus, FileType, InProgress, R};
 
+use super::SourceFile;
+
 #[derive(Debug, Clone)]
 pub struct FileCopy {
-  source_file_path: PathBuf,
+  source_file: SourceFile,
   destination_dir_path: PathBuf,
   progress_bar: MyProgressBar,
 }
 
 impl FileCopy {
 
-  pub fn new<S: AsRef<Path>, D: AsRef<Path>>(source_file_path: S, destination_dir_path: D, multi: &MultiProgress) -> Self {
-    let source_file = source_file_path.as_ref().to_path_buf();
+  pub fn new<D: AsRef<Path>>(source_file: SourceFile, destination_dir_path: D, multi: &MultiProgress) -> Self {
     let destination_dir = destination_dir_path.as_ref().to_path_buf();
 
     let progress_bar = MyProgressBar::new(multi);
 
     Self {
-      source_file_path: source_file,
+      source_file,
       destination_dir_path: destination_dir,
       progress_bar: progress_bar,
     }
   }
 
   pub fn source_file_name(&self) -> String {
-    self.source_file_path.file_name().unwrap().to_string_lossy().to_string()
+    self.source_file.file_name()
   }
 
   pub fn destination_file(&self) -> PathBuf {
-    self.destination_dir_path.join(self.source_file_name())
+    self.destination_dir_path.join(self.source_file.relative_path())
   }
 
   pub async fn copy<'a>(self, tx: Sender<FileStatus>) -> R<()> {
@@ -47,7 +48,7 @@ impl FileCopy {
         .send(FileStatus::NotStarted(progress_bar.clone()))
         .await;
 
-    let mut source_file = Self::open_source_file(&self.source_file_path, &tx, progress_bar).await?;
+    let mut source_file = Self::open_source_file(&self.source_file.full_path(), &tx, progress_bar).await?;
     let file_size = Self::get_file_length(&source_file, FileType::Source, &tx, progress_bar).await?;
     let _ = Self::create_destination_path(&self.destination_file(), &tx, progress_bar).await?;
     let mut destination_file = Self::create_destination_file(&self.destination_file(), &tx, progress_bar).await?;
