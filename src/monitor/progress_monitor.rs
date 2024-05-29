@@ -10,9 +10,12 @@ impl FileCopyProgressMonitor {
         match value {
           FileStatus::NotStarted(pb) => pb.set_status("waiting..."),
           FileStatus::OpenedSourceFile(pb) => pb.set_status("opened source file"),
+          FileStatus::GettingFileLength(FileType::Source, pb) => pb.set_status("getting source file length"),
           FileStatus::GotFileLength(FileType::Source, pb) => pb.set_status("calculated source file length"),
+          FileStatus::GettingFileLength(FileType::Destination, pb) => pb.set_status("getting destination file length"),
           FileStatus::GotFileLength(FileType::Destination, pb) => pb.set_status("calculated destination file length"),
           FileStatus::CreatedDestinationFile(pb) => pb.set_status("created destination file"),
+          FileStatus::Flushing(pb) => pb.set_status("flushing destination..."),
 
           FileStatus::CopyInProgress(progress) => {
               let bytes_written = progress.bytes_written();

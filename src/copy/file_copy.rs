@@ -84,6 +84,9 @@ impl FileCopy {
   }
 
   async fn get_file_length(file: &File, file_type: FileType, tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<u64> {
+
+      let _ = tx.send(FileStatus::GettingFileLength(file_type.clone(), progress_bar.clone())).await;
+
       match file.metadata().await {
         Ok(meta) => {
           let _ = tx.send(FileStatus::GotFileLength(file_type, progress_bar.clone())).await;
@@ -170,6 +173,8 @@ impl FileCopy {
   }
 
   async fn complete_file_copy(destination_file: &mut File, file_size: u64, tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<()> {
+
+        let _ = tx.send(FileStatus::Flushing(progress_bar.clone())).await;
 
         let _ = destination_file
           .flush()

@@ -4,11 +4,13 @@ pub enum FileStatus {
   NotStarted(MyProgressBar),
   OpenedSourceFile(MyProgressBar),
   GotFileLength(FileType, MyProgressBar),
+  GettingFileLength(FileType, MyProgressBar),
   CreatedDestinationFile(MyProgressBar),
   CopyInProgress(InProgress),
   CopyComplete(Complete),
   FileSizesMatch(MyProgressBar),
-  Failed(FailedReason)
+  Failed(FailedReason),
+  Flushing(MyProgressBar)
 }
 
 pub struct InProgress {
@@ -51,6 +53,7 @@ impl Complete {
   }
 }
 
+#[derive(Clone)]
 pub enum FileType {
   Source,
   Destination,
