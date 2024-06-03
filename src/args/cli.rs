@@ -25,7 +25,7 @@ pub struct Args {
    #[arg(short,long, default_value="4")]
    pub concurrency: u8,
 
-   /// The maximum buffer size to use when copying
+   /// The maximum buffer size to use when copying. [default: 1MB]
    #[arg(short,long, value_parser = clap::value_parser!(Buffer))]
    pub buffer_size: Option<Buffer>,
 
