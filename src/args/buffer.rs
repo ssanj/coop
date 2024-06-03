@@ -19,7 +19,7 @@ pub struct BufferError(String);
 
 impl BufferError {
 
-  const FORMAT: &'static str = "Expected format: <num><unit>, where num = <number>, unit = <KB|MB>";
+  const FORMAT: &'static str = "Expected format: <num><unit>, where num = <number>, unit = <KB|MB>, max KB is 1024, max MB is 128";
 
   pub fn format_error(arg: &str) -> Self {
     BufferError(format!("Invalid buffer format supplied: '{}'. {}", arg, Self::FORMAT))
@@ -119,24 +119,30 @@ mod tests {
     fn fails_with_invalid_size() {
       let buffer: Result<Buffer, BufferError> = FromStr::from_str("OneMB");
 
-      assert_eq!(buffer, Err(BufferError("Invalid buffer format supplied: 'OneMB'. Expected format: <num><unit>, where num = <number>, unit = <KB|MB>".to_owned())))
+      assert_eq!(buffer, Err(BufferError("Invalid buffer format supplied: 'OneMB'. Expected format: <num><unit>, where num = <number>, unit = <KB|MB>, max KB is 1024, max MB is 128".to_owned())))
     }
 
     #[test]
     fn fails_with_invalid_unit() {
       let buffer: Result<Buffer, BufferError> = FromStr::from_str("1GB");
-      assert_eq!(buffer, Err(BufferError("Invalid buffer format supplied: '1GB'. Expected format: <num><unit>, where num = <number>, unit = <KB|MB>".to_owned())))
+      assert_eq!(buffer, Err(BufferError("Invalid buffer format supplied: '1GB'. Expected format: <num><unit>, where num = <number>, unit = <KB|MB>, max KB is 1024, max MB is 128".to_owned())))
     }
 
     #[test]
     fn fails_with_invalid_input_start() {
       let buffer: Result<Buffer, BufferError> = FromStr::from_str(" 1KB");
-      assert_eq!(buffer, Err(BufferError("Invalid buffer format supplied: ' 1KB'. Expected format: <num><unit>, where num = <number>, unit = <KB|MB>".to_owned())))
+      assert_eq!(buffer, Err(BufferError("Invalid buffer format supplied: ' 1KB'. Expected format: <num><unit>, where num = <number>, unit = <KB|MB>, max KB is 1024, max MB is 128".to_owned())))
+    }
+
+    #[test]
+    fn fails_with_invalid_input() {
+      let buffer: Result<Buffer, BufferError> = FromStr::from_str("ABC");
+      assert_eq!(buffer, Err(BufferError("Invalid buffer format supplied: 'ABC'. Expected format: <num><unit>, where num = <number>, unit = <KB|MB>, max KB is 1024, max MB is 128".to_owned())))
     }
 
     #[test]
     fn fails_with_invalid_input_end() {
       let buffer: Result<Buffer, BufferError> = FromStr::from_str("1KB ");
-      assert_eq!(buffer, Err(BufferError("Invalid buffer format supplied: '1KB '. Expected format: <num><unit>, where num = <number>, unit = <KB|MB>".to_owned())))
+      assert_eq!(buffer, Err(BufferError("Invalid buffer format supplied: '1KB '. Expected format: <num><unit>, where num = <number>, unit = <KB|MB>, max KB is 1024, max MB is 128".to_owned())))
     }
 }
