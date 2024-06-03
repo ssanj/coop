@@ -5,6 +5,7 @@ use once_cell::sync::Lazy;
 use tokio::sync::mpsc::{self};
 use tokio::task::JoinSet;
 
+use crate::args::buffer::Buffer;
 use crate::cli::Args;
 use crate::console::{CoopConsole, UserResult};
 use crate::copy::{FileCopy, SourceFile};
@@ -31,6 +32,7 @@ impl CoopWorkflow {
     let destination_dir = &args.destination_dir;
     let ignored_regexes = &args.ignore;
     let concurrency = args.concurrency as u16;
+    let buffer_size = args.buffer_size.unwrap_or(Buffer::DEFAULT_BUFFER_SIZE);
 
     let files_to_copy = SourceFile::get_source_files(source_dir, ignored_regexes);
     let selection = CoopConsole::show_copy_state(&files_to_copy, concurrency, destination_dir.to_str().unwrap_or("<Unknown>"));
@@ -46,7 +48,7 @@ impl CoopWorkflow {
         .map(|f| FileCopy::new(f, destination_dir, &MULTI) )
         .collect();
 
-    let (tx, rx) = mpsc::channel::<FileStatus>(100);
+    let (tx, rx) = mpsc::channel::<FileStatus>(256);
     let monitor_fut = FileCopyProgressMonitor::monitor(rx);
 
     let mut join_set = JoinSet::new();
@@ -55,11 +57,11 @@ impl CoopWorkflow {
 
     let mut running = 0_u16;
     for task in copy_tasks {
-      join_set.spawn(task.copy(tx.clone())); // each task gets a copy of tx
-      running = min(running + 1, u16::MAX);
+      join_set.spawn(task.copy(buffer_size.clone(), tx.clone())); // each task gets a copy of tx
+      running = min(running + 1, u16::MAX); // TODO: We need to tweak this value
 
       if running >= concurrency {
-        // wait for a single task to complete so we fall below the concurrency threshold
+        // Wait for a single task to complete so we fall below the concurrency threshold
         let _ = join_set.join_next().await;
         running = max(running - 1, 0);
       }

@@ -3,6 +3,8 @@ use regex::Regex;
 
 use clap::Parser;
 
+use super::buffer::Buffer;
+
 /// Making progress on your network file copy
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about)]
@@ -22,6 +24,10 @@ pub struct Args {
    /// The maximum number of file copies to perform concurrently
    #[arg(short,long, default_value="4")]
    pub concurrency: u8,
+
+   /// The maximum buffer size to use when copying
+   #[arg(short,long, value_parser = clap::value_parser!(Buffer))]
+   pub buffer_size: Option<Buffer>,
 
    /// Files to ignore during copy.
    ///
