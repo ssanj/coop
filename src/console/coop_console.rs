@@ -1,6 +1,6 @@
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
 
-use crate::copy::SourceFile;
+use crate::{args::BufferSize, copy::SourceFile};
 
 pub struct CoopConsole;
 
@@ -11,7 +11,7 @@ pub enum UserResult {
 }
 
 impl CoopConsole {
-  pub fn show_copy_state(files_to_copy: &[SourceFile], concurrency: u16, destination_dir: &str) -> UserResult {
+  pub fn show_copy_state(files_to_copy: &[SourceFile], concurrency: u16, buffer_size: &BufferSize, destination_dir: &str) -> UserResult {
     let files: Vec<_> =
       files_to_copy
         .iter()
@@ -23,6 +23,7 @@ impl CoopConsole {
       println!("  {:03} - {}", index + 1, file)
     }
     println!("Concurrency: {}", concurrency);
+    println!("Buffer size: {}", buffer_size);
     println!("Destination: {}", destination_dir);
 
     let options = ["no", "yes"];

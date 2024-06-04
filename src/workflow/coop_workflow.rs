@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 use tokio::sync::mpsc::{self};
 use tokio::task::JoinSet;
 
-use crate::args::buffer::Buffer;
+use crate::args::BufferSize;
 use crate::cli::Args;
 use crate::console::{CoopConsole, UserResult};
 use crate::copy::{FileCopy, SourceFile};
@@ -32,10 +32,16 @@ impl CoopWorkflow {
     let destination_dir = &args.destination_dir;
     let ignored_regexes = &args.ignore;
     let concurrency = args.concurrency as u16;
-    let buffer_size = args.buffer_size.unwrap_or(Buffer::DEFAULT_BUFFER_SIZE);
+    let buffer_size = args.buffer_size.unwrap_or(BufferSize::DEFAULT_BUFFER_SIZE);
 
     let files_to_copy = SourceFile::get_source_files(source_dir, ignored_regexes);
-    let selection = CoopConsole::show_copy_state(&files_to_copy, concurrency, destination_dir.to_str().unwrap_or("<Unknown>"));
+    let selection =
+      CoopConsole::show_copy_state(
+        &files_to_copy,
+        concurrency,
+        &buffer_size,
+        destination_dir.to_str().unwrap_or("<Unknown>")
+      );
 
     let _ = match selection {
       UserResult::Continue => (),

@@ -4,9 +4,9 @@ use tokio::fs::{DirBuilder, File};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 
-use crate::args::buffer::Buffer;
 use crate::progress::MyProgressBar;
 use crate::model::{Complete, FailedReason, FileStatus, FileType, InProgress, R};
+use crate::args::BufferSize;
 
 use super::SourceFile;
 
@@ -39,7 +39,7 @@ impl FileCopy {
     self.destination_dir_path.join(self.source_file.relative_path())
   }
 
-  pub async fn copy<'a>(self, buffer: Buffer, tx: Sender<FileStatus>) -> R<()> {
+  pub async fn copy<'a>(self, buffer: BufferSize, tx: Sender<FileStatus>) -> R<()> {
     let progress_bar = &self.progress_bar;
     progress_bar.tick();
     progress_bar.set_prefix(self.source_file_name());
@@ -185,6 +185,7 @@ impl FileCopy {
 
         let flush_result = destination_file.flush().await;
 
+        // TODO: Rewrite this
         match flush_result {
           Ok(_) => (),
           Err(e) => {

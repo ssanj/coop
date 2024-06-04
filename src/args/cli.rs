@@ -3,7 +3,7 @@ use regex::Regex;
 
 use clap::Parser;
 
-use super::buffer::Buffer;
+use super::buffer_size::BufferSize;
 
 /// Making progress on your network file copy
 #[derive(Parser, Debug, Clone)]
@@ -26,8 +26,8 @@ pub struct Args {
    pub concurrency: u8,
 
    /// The maximum buffer size to use when copying. [default: 1MB]
-   #[arg(short,long, value_parser = clap::value_parser!(Buffer))]
-   pub buffer_size: Option<Buffer>,
+   #[arg(short,long, value_parser = clap::value_parser!(BufferSize))]
+   pub buffer_size: Option<BufferSize>,
 
    /// Files to ignore during copy.
    ///
