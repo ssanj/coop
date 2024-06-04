@@ -1,4 +1,4 @@
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::broadcast::Receiver;
 use crate::model::{R, FileStatus, FileType, FailedReason};
 
 pub struct FileCopyProgressMonitor;
@@ -6,7 +6,7 @@ pub struct FileCopyProgressMonitor;
 impl FileCopyProgressMonitor {
 
    pub async fn monitor(mut rx: Receiver<FileStatus>) -> R<()> {
-      while let Some(value) = rx.recv().await {
+      while let Ok(value) = rx.recv().await {
         match value {
           FileStatus::NotStarted(pb) => pb.set_status("waiting..."),
           FileStatus::OpenedSourceFile(pb) => pb.set_status("opened source file"),
@@ -26,7 +26,7 @@ impl FileCopyProgressMonitor {
 
           FileStatus::CopyComplete(complete) => {
             let pb = complete.progress_bar();
-            pb.complete("finished copying")
+            pb.set_status("finished copying")
           },
 
           FileStatus::FileSizesMatch(pb) => {

@@ -1,8 +1,8 @@
 use std::cmp::{max, min};
+use std::sync::Arc;
 
 use indicatif::MultiProgress;
-use once_cell::sync::Lazy;
-use tokio::sync::mpsc::{self};
+use tokio::sync::broadcast::{self};
 use tokio::task::JoinSet;
 
 use crate::args::BufferSize;
@@ -12,7 +12,7 @@ use crate::copy::{FileCopy, SourceFile};
 use crate::model::FileStatus;
 use crate::monitor::FileCopyProgressMonitor;
 
-static MULTI: Lazy<MultiProgress> = Lazy::new(|| MultiProgress::new());
+// static MULTI: Lazy<MultiProgress> = Lazy::new(|| MultiProgress::new());
 
 pub struct CoopWorkflow {
   args: Args
@@ -48,13 +48,15 @@ impl CoopWorkflow {
       _ => return
     };
 
+    let MULTI = Arc::new(MultiProgress::new());
+
     let copy_tasks: Vec<_> =
       files_to_copy
         .into_iter()
         .map(|f| FileCopy::new(f, destination_dir, &MULTI) )
         .collect();
 
-    let (tx, rx) = mpsc::channel::<FileStatus>(256);
+    let (tx, rx) = broadcast::channel::<FileStatus>(256);
     let monitor_fut = FileCopyProgressMonitor::monitor(rx);
 
     let mut join_set = JoinSet::new();

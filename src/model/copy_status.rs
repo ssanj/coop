@@ -1,5 +1,6 @@
 use crate::progress::MyProgressBar;
 
+#[derive(Debug, Clone)]
 pub enum FileStatus {
   NotStarted(MyProgressBar),
   OpenedSourceFile(MyProgressBar),
@@ -13,6 +14,7 @@ pub enum FileStatus {
   Flushing(MyProgressBar)
 }
 
+#[derive(Debug, Clone)]
 pub struct InProgress {
   bytes_written: u64,
   progress_bar: MyProgressBar
@@ -36,6 +38,7 @@ impl InProgress {
   }
 }
 
+#[derive(Debug, Clone)]
 pub struct Complete {
   progress_bar: MyProgressBar
 }
@@ -53,12 +56,13 @@ impl Complete {
   }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum FileType {
   Source,
   Destination,
 }
 
+#[derive(Debug, Clone)]
 pub enum FailedReason {
   ReadFailed(String, MyProgressBar),
   WriteFailed(String, MyProgressBar),
