@@ -76,7 +76,7 @@ impl CoopProgressMonitor {
 
     while let Ok(value) = rx.recv().await {
       match value {
-        FileStatus::Success(pb) => {
+        FileStatus::Success(file_name, pb) => {
           let completed = self.completed.get_mut();
           *completed += 1;
           self.progress.inc(1);
@@ -87,7 +87,7 @@ impl CoopProgressMonitor {
             self.progress.finish()
           }
 
-          self.insert_completed_bar("file")
+          self.insert_completed_bar(&file_name)
         },
 
         FileStatus::Failed(..) => {

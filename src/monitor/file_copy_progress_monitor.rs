@@ -33,7 +33,7 @@ impl FileCopyProgressMonitor {
             pb.complete("verification complete ✅");
           },
 
-          FileStatus::Success(_) => (),
+          FileStatus::Success(..) => (),
 
           FileStatus::Failed(FailedReason::ReadFailed(reason, pb)) => {
             pb.set_error(&format!("❌ Read failed: {}", reason))

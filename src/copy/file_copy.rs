@@ -68,7 +68,7 @@ impl FileCopy {
       let bytes_read = Self::read_to_buffer(&mut source_file, &mut buffer, &tx, &progress_bar).await?;
 
       if bytes_read == 0 {
-        Self::complete_file_copy(&mut destination_file, file_size, &tx, &progress_bar).await?;
+        Self::complete_file_copy(&mut destination_file, file_size, &tx, &progress_bar, self.source_file_name()).await?;
         return Ok(())
       }
 
@@ -178,7 +178,7 @@ impl FileCopy {
       Ok(())
   }
 
-  async fn complete_file_copy(destination_file: &mut File, file_size: u64, tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<()> {
+  async fn complete_file_copy(destination_file: &mut File, file_size: u64, tx: &Sender<FileStatus>, progress_bar: &MyProgressBar, file_name: String) -> R<()> {
 
       let _ = tx.send(FileStatus::Flushing(progress_bar.clone()));
 
@@ -197,7 +197,7 @@ impl FileCopy {
       let dest_file_size = Self::get_file_length(destination_file, FileType::Destination, tx, progress_bar).await?;
 
       Self::compare_file_sizes(file_size, dest_file_size, &tx, &progress_bar).await?;
-      Self::succeed(&tx, &progress_bar).await?;
+      Self::succeed(&tx, &progress_bar, file_name).await?;
 
       Ok(())
   }
@@ -214,8 +214,8 @@ impl FileCopy {
     Ok(())
   }
 
-  async fn succeed(tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<()> {
-    let _ = tx.send(FileStatus::Success(progress_bar.clone()));
+  async fn succeed(tx: &Sender<FileStatus>, progress_bar: &MyProgressBar, file_name: String) -> R<()> {
+    let _ = tx.send(FileStatus::Success(file_name, progress_bar.clone()));
 
     Ok(())
   }

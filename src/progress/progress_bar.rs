@@ -1,3 +1,5 @@
+use std::sync::Mutex;
+
 use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
 
 #[derive(Debug, Clone)]
@@ -42,7 +44,7 @@ impl MyProgressBar {
       primary,
       secondary,
       error,
-      separator
+      separator,
     }
   }
 
@@ -68,7 +70,7 @@ impl MyProgressBar {
   }
 
   pub fn set_prefix(&self, prefix: String) {
-    self.secondary.set_prefix(prefix)
+    self.secondary.set_prefix(prefix.clone())
   }
 
   pub fn update_progress(&self, bytes_written: u64) {
