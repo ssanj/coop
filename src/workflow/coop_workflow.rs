@@ -1,5 +1,6 @@
 use std::cmp::{max, min};
 use std::sync::Arc;
+use std::time::Instant;
 
 use indicatif::MultiProgress;
 use tokio::sync::broadcast::{self};
@@ -10,7 +11,7 @@ use crate::cli::Args;
 use crate::console::{CoopConsole, UserResult};
 use crate::copy::{FileCopy, SourceFile};
 use crate::model::FileStatus;
-use crate::monitor::FileCopyProgressMonitor;
+use crate::monitor::{CoopProgressMonitor, FileCopyProgressMonitor};
 
 // static MULTI: Lazy<MultiProgress> = Lazy::new(|| MultiProgress::new());
 
@@ -48,20 +49,25 @@ impl CoopWorkflow {
       _ => return
     };
 
-    let MULTI = Arc::new(MultiProgress::new());
+    let multi = MultiProgress::new();
 
     let copy_tasks: Vec<_> =
       files_to_copy
         .into_iter()
-        .map(|f| FileCopy::new(f, destination_dir, &MULTI) )
+        .map(|f| FileCopy::new(f, destination_dir, &multi) )
         .collect();
 
     let (tx, rx) = broadcast::channel::<FileStatus>(256);
-    let monitor_fut = FileCopyProgressMonitor::monitor(rx);
+    let rx2 = tx.subscribe();
+
+    let copy_monitor_fut = FileCopyProgressMonitor::monitor(rx);
+    let coop_monitor = CoopProgressMonitor::new(&multi, copy_tasks.len() as u64);
+    let coop_monitor_fut = coop_monitor.monitor(rx2, Instant::now());
 
     let mut join_set = JoinSet::new();
-    // Start the monitor first, so we don't miss any messages
-    join_set.spawn(monitor_fut);
+    // Start the monitors first, so we don't miss any messages
+    join_set.spawn(copy_monitor_fut);
+    join_set.spawn(coop_monitor_fut);
 
     let mut running = 0_u16;
     for task in copy_tasks {
