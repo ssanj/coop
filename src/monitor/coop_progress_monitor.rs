@@ -38,11 +38,12 @@ impl CoopProgressMonitor {
         while !pb.is_finished() {
           let current_time = Instant::now();
           let duration = current_time.duration_since(start_time);
+          let millis = duration.as_millis();
           let seconds = duration.as_secs();
           let minutes = seconds / 60;
           let hours = minutes / 60;
-          pb.set_message(format!("{:02}:{:02}:{:02}", hours, minutes, seconds));
-          thread::sleep(Duration::from_secs(1));
+          pb.set_message(format!("{:02}:{:02}:{:02}.{:02}", hours, minutes, seconds, millis));
+          thread::sleep(Duration::from_millis(250));
         }
       });
       h
