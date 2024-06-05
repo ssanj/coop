@@ -1,5 +1,5 @@
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
-
+use console::style;
 use crate::{args::BufferSize, copy::SourceFile};
 
 pub struct CoopConsole;
@@ -18,13 +18,13 @@ impl CoopConsole {
         .map(|sf| sf.relative_path().clone())
         .collect();
 
-    println!("Source files:");
+    println!("{}:", style("Source files").green());
     for (index, file) in files.iter().enumerate() {
-      println!("  {:03} - {}", index + 1, file)
+      println!("  {:06} - {}", index + 1, style(file).cyan())
     }
-    println!("Concurrency: {}", concurrency);
-    println!("Buffer size: {}", buffer_size);
-    println!("Destination: {}", destination_dir);
+    println!("{}: {}", style("Concurrency").green(), concurrency);
+    println!("{}: {}", style("Buffer size").green(), buffer_size);
+    println!("{}: {}", style("Destination").green(), destination_dir);
 
     let options = ["no", "yes"];
 
