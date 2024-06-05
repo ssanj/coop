@@ -51,22 +51,24 @@ impl CoopProgressMonitor {
     while let Ok(value) = rx.recv().await {
       match value {
         FileStatus::CopyComplete(..) => {
-          let current = self.completed.get_mut();
-          *current += 1;
+          let completed = self.completed.get_mut();
+          *completed += 1;
           self.progress.inc(1);
-          self.progress.set_prefix(format!("{}/{}", current, self.items));
+          self.progress.set_prefix(format!("{}/{}", completed, self.items));
 
-          if *current >= self.items {
+          // If all items are completed, then finish
+          if *completed >= self.items {
             self.progress.finish()
           }
         },
 
         FileStatus::Failed(..) => {
-          let current = self.completed.get_mut();
-          *current += 1;
+          let completed = self.completed.get_mut();
+          *completed += 1;
           self.progress.inc(1);
 
-          if *current >= self.items {
+          // If all items are completed, then finish
+          if *completed >= self.items {
             self.progress.finish()
           }
         },
