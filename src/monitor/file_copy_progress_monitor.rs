@@ -30,8 +30,10 @@ impl FileCopyProgressMonitor {
           },
 
           FileStatus::FileSizesMatch(pb) => {
-            pb.complete("verification complete ✅")
+            pb.complete("verification complete ✅");
           },
+
+          FileStatus::Success(_) => (),
 
           FileStatus::Failed(FailedReason::ReadFailed(reason, pb)) => {
             pb.set_error(&format!("❌ Read failed: {}", reason))

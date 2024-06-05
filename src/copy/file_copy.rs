@@ -180,25 +180,26 @@ impl FileCopy {
 
   async fn complete_file_copy(destination_file: &mut File, file_size: u64, tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<()> {
 
-        let _ = tx.send(FileStatus::Flushing(progress_bar.clone()));
+      let _ = tx.send(FileStatus::Flushing(progress_bar.clone()));
 
-        let flush_result = destination_file.flush().await;
+      let flush_result = destination_file.flush().await;
 
-        // TODO: Rewrite this
-        match flush_result {
-          Ok(_) => (),
-          Err(e) => {
-            let _ = tx.send(FileStatus::Failed(FailedReason::FlushFailed(e.to_string(), progress_bar.clone())));
-          }
-        };
+      // TODO: Rewrite this
+      match flush_result {
+        Ok(_) => (),
+        Err(e) => {
+          let _ = tx.send(FileStatus::Failed(FailedReason::FlushFailed(e.to_string(), progress_bar.clone())));
+        }
+      };
 
-        let _ = tx.send(FileStatus::CopyComplete(Complete::new(progress_bar)));
+      let _ = tx.send(FileStatus::CopyComplete(Complete::new(progress_bar)));
 
-        let dest_file_size = Self::get_file_length(destination_file, FileType::Destination, tx, progress_bar).await?;
+      let dest_file_size = Self::get_file_length(destination_file, FileType::Destination, tx, progress_bar).await?;
 
-        Self::compare_file_sizes(file_size, dest_file_size, &tx, &progress_bar).await?;
+      Self::compare_file_sizes(file_size, dest_file_size, &tx, &progress_bar).await?;
+      Self::succeed(&tx, &progress_bar).await?;
 
-        Ok(())
+      Ok(())
   }
 
 
@@ -209,6 +210,12 @@ impl FileCopy {
     } else {
       let _ = tx.send(FileStatus::Failed(FailedReason::FileSizesAreDifferent(source_file_size, destination_file_size, progress_bar.clone())));
     }
+
+    Ok(())
+  }
+
+  async fn succeed(tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<()> {
+    let _ = tx.send(FileStatus::Success(progress_bar.clone()));
 
     Ok(())
   }

@@ -51,7 +51,7 @@ impl CoopProgressMonitor {
 
     while let Ok(value) = rx.recv().await {
       match value {
-        FileStatus::CopyComplete(..) => {
+        FileStatus::Success(pb) => {
           let completed = self.completed.get_mut();
           *completed += 1;
           self.progress.inc(1);

@@ -10,6 +10,7 @@ pub enum FileStatus {
   CopyInProgress(InProgress),
   CopyComplete(Complete),
   FileSizesMatch(MyProgressBar),
+  Success(MyProgressBar),
   Failed(FailedReason),
   Flushing(MyProgressBar)
 }

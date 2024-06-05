@@ -14,24 +14,24 @@ impl MyProgressBar {
     let primary =
       ProgressBar::new(0)
       .with_style(primary_style)
-      .with_finish(indicatif::ProgressFinish::Abandon);
+      .with_finish(indicatif::ProgressFinish::AndClear);
 
     let secondary_style = ProgressStyle::with_template("file: {prefix}, status: {msg}").unwrap();
     let secondary =
       ProgressBar::new(10)
         .with_style(secondary_style)
-        .with_finish(indicatif::ProgressFinish::Abandon);
+        .with_finish(indicatif::ProgressFinish::AndClear);
 
     let error_style = ProgressStyle::with_template("{msg:.red}").unwrap();
     let error =
       ProgressBar::new(10)
         .with_style(error_style)
-        .with_finish(indicatif::ProgressFinish::Abandon);
+        .with_finish(indicatif::ProgressFinish::AndClear);
 
     let separator =
       ProgressBar::new(10)
         .with_style(ProgressStyle::with_template("{wide_bar:.blue}").unwrap().progress_chars("--"))
-        .with_finish(indicatif::ProgressFinish::Abandon);
+        .with_finish(indicatif::ProgressFinish::AndClear);
 
     multi.add(primary.clone());
     multi.add(secondary.clone());
@@ -76,7 +76,13 @@ impl MyProgressBar {
   }
 
   pub fn complete(&self, msg: &str) {
-    self.primary.finish();
     self.secondary.set_message(msg.to_owned());
+  }
+
+  pub fn clear(&self) {
+    self.primary.finish_and_clear();
+    self.secondary.finish_and_clear();
+    self.error.finish_and_clear();
+    self.separator.finish_and_clear();
   }
 }
