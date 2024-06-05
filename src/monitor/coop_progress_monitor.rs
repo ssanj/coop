@@ -2,32 +2,57 @@ use std::{sync::atomic::AtomicU64, thread, time::{Duration, Instant}};
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::sync::broadcast::Receiver;
+use std::sync::atomic;
+
 use crate::model::{R, FileStatus};
 
 pub struct CoopProgressMonitor {
   progress: ProgressBar,
   items: u64,
   completed: AtomicU64,
+  completed_index: AtomicU64,
+  completed_items: Vec<ProgressBar>,
 }
 
 impl CoopProgressMonitor {
 
   pub fn new(multi: &MultiProgress, size: u64) -> Self {
-    let progress_bar_style =
+    let completed_items =
+      (0..size)
+        .into_iter()
+        .map(|_| {
+          let pb = Self::create_completed_progress_bar();
+          multi.add(pb.clone())
+        })
+        .collect();
+
+    let overall_bar =
       ProgressStyle::with_template("[{msg}] overall progress: {prefix} [{wide_bar:.green}]").unwrap();
 
-    let progress_bar =
+    let overall_bar =
       ProgressBar::new(size)
-      .with_style(progress_bar_style)
+      .with_style(overall_bar)
       .with_finish(indicatif::ProgressFinish::Abandon);
 
-    multi.add(progress_bar.clone());
+    // Add this at the end
+    multi.add(overall_bar.clone());
 
     Self {
-      progress: progress_bar,
+      progress: overall_bar,
       items: size,
-      completed: AtomicU64::new(0)
+      completed: AtomicU64::new(0),
+      completed_index: AtomicU64::new(0),
+      completed_items
     }
+  }
+
+  fn create_completed_progress_bar() -> ProgressBar {
+    let completed_bar_style =
+      ProgressStyle::with_template("{prefix}").unwrap();
+
+    ProgressBar::new(1)
+    .with_style(completed_bar_style)
+    .with_finish(indicatif::ProgressFinish::Abandon)
   }
 
   pub async fn monitor(mut self, mut rx: Receiver<FileStatus>, start_time: Instant) -> R<()> {
@@ -61,6 +86,8 @@ impl CoopProgressMonitor {
           if *completed >= self.items {
             self.progress.finish()
           }
+
+          self.insert_completed_bar("file")
         },
 
         FileStatus::Failed(..) => {
@@ -81,6 +108,15 @@ impl CoopProgressMonitor {
     let _ = timer_handle.join();
 
     Ok(())
+  }
+
+  fn insert_completed_bar(&mut self, arg: &str) {
+    let current_index = self.completed_index.load(atomic::Ordering::Relaxed);
+    if let Some(pb) = self.completed_items.get(current_index as usize) {
+      pb.set_prefix(arg.to_owned());
+      let next_index = self.completed_index.get_mut();
+      *next_index += 1;
+    }
   }
 }
 
