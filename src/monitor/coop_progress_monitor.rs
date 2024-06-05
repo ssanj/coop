@@ -55,12 +55,20 @@ impl CoopProgressMonitor {
           *current += 1;
           self.progress.inc(1);
           self.progress.set_prefix(format!("{}/{}", current, self.items));
-          self.progress.finish()
+
+          if *current >= self.items {
+            self.progress.finish()
+          }
         },
 
         FileStatus::Failed(..) => {
+          let current = self.completed.get_mut();
+          *current += 1;
           self.progress.inc(1);
-          self.progress.finish()
+
+          if *current >= self.items {
+            self.progress.finish()
+          }
         },
 
         _ => ()
