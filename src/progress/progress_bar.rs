@@ -62,7 +62,7 @@ impl MyProgressBar {
   pub fn set_error(&self, msg: &str) {
     self.error.set_message(msg.to_owned());
     // When there is an error, consider this progress as finished.
-    self.primary.finish()
+    self.clear()
   }
 
   pub fn set_status(&self, msg: &str) {
@@ -81,7 +81,7 @@ impl MyProgressBar {
     self.secondary.set_message(msg.to_owned());
   }
 
-  pub fn clear(&self) {
+  fn clear(&self) {
     self.primary.finish_and_clear();
     self.secondary.finish_and_clear();
     self.error.finish_and_clear();
