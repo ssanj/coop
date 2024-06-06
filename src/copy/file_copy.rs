@@ -5,9 +5,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::broadcast::Sender;
 
 use crate::progress::MyProgressBar;
-use crate::model::{Complete, FailedReason, FileStatus, FileType, InProgress, R};
+use crate::model::{Complete, CopyError, FailedReason, FileName, FileStatus, FileType, InProgress, SizeComparison, R};
 use crate::args::BufferSize;
-
 use super::SourceFile;
 
 #[derive(Debug, Clone)]
@@ -43,13 +42,14 @@ impl FileCopy {
     let progress_bar = &self.progress_bar;
     progress_bar.tick();
     progress_bar.set_prefix(self.source_file_name());
+    let file_name = &self.source_file.file_name();
 
     let _ =
       tx
         .send(FileStatus::NotStarted(progress_bar.clone()));
 
     let mut source_file = Self::open_source_file(&self.source_file.full_path(), &tx, progress_bar).await?;
-    let file_size = Self::get_file_length(&source_file, FileType::Source, &tx, progress_bar).await?;
+    let file_size = Self::get_file_length(file_name, &source_file, FileType::Source, &tx, progress_bar).await?;
     Self::create_destination_path(&self.destination_file(), &tx, progress_bar).await?;
     let mut destination_file = Self::create_destination_file(&self.destination_file(), &tx, progress_bar).await?;
 
@@ -65,14 +65,14 @@ impl FileCopy {
     let mut buffer = vec![0; buf_size];
 
     loop {
-      let bytes_read = Self::read_to_buffer(&mut source_file, &mut buffer, &tx, &progress_bar).await?;
+      let bytes_read = Self::read_to_buffer(file_name, &mut source_file, &mut buffer, &tx, &progress_bar).await?;
 
       if bytes_read == 0 {
-        Self::complete_file_copy(&mut destination_file, file_size, &tx, &progress_bar, self.source_file_name()).await?;
+        Self::complete_file_copy(file_name, &mut destination_file, file_size, &tx, &progress_bar, self.source_file_name()).await?;
         return Ok(())
       }
 
-      Self::write_to_destination(&mut destination_file, &buffer[..bytes_read as usize], &tx, &progress_bar).await?;
+      Self::write_to_destination(file_name, &mut destination_file, &buffer[..bytes_read as usize], &tx, &progress_bar).await?;
     }
   }
 
@@ -83,13 +83,22 @@ impl FileCopy {
           Ok(file)
         },
         Err(e) => {
-          let _ = tx.send(FileStatus::Failed(FailedReason::CouldNotReadSourceFile(e.to_string(), progress_bar.clone())));
+          let _ =
+            tx.send(
+              FileStatus::Failed(
+                FailedReason::CouldNotReadSourceFile(
+                  file.into(),
+                  e.into(),
+                  progress_bar.clone()
+                )
+              )
+            );
           Err(())
         }
       }
   }
 
-  async fn get_file_length(file: &File, file_type: FileType, tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<u64> {
+  async fn get_file_length(file_name: &str, file: &File, file_type: FileType, tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<u64> {
 
       let _ = tx.send(FileStatus::GettingFileLength(file_type.clone(), progress_bar.clone()));
 
@@ -99,7 +108,17 @@ impl FileCopy {
           Ok(meta.len())
         },
         Err(e) => {
-          let _ = tx.send(FileStatus::Failed(FailedReason::CouldNotGetFileSize(e.to_string(), file_type, progress_bar.clone())));
+          let _ =
+            tx.send(
+              FileStatus::Failed(
+                FailedReason::CouldNotGetFileSize(
+                  FileName::new(file_name),
+                  e.into(),
+                  file_type,
+                  progress_bar.clone()
+                )
+              )
+            );
           Err(())
         }
       }
@@ -117,7 +136,16 @@ impl FileCopy {
               .await;
 
             if let Err(e) = result {
-              let _ = tx.send(FileStatus::Failed(FailedReason::CouldNotCreateDestinationDir(e.to_string(), progress_bar.clone())));
+              let _ =
+                tx.send(
+                  FileStatus::Failed(
+                    FailedReason::CouldNotCreateDestinationDir(
+                      destination_file.into(),
+                      e.into(),
+                      progress_bar.clone()
+                    )
+                  )
+                );
               return Err(());
             }
          }
@@ -133,13 +161,22 @@ impl FileCopy {
             Ok(df)
           },
           Err(e) => {
-            let _ = tx.send(FileStatus::Failed(FailedReason::CouldNotCreateDestinationFile(e.to_string(), progress_bar.clone())));
+            let _ =
+              tx.send(
+                FileStatus::Failed(
+                  FailedReason::CouldNotCreateDestinationFile(
+                    destination_file.into(),
+                    e.into(),
+                    progress_bar.clone()
+                  )
+                )
+              );
             Err(())
           }
         }
   }
 
-  async fn read_to_buffer(source_file: &mut File, buffer: &mut [u8], tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<u64> {
+  async fn read_to_buffer(file: &str, source_file: &mut File, buffer: &mut [u8], tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<u64> {
     let bytes_read_result =
       source_file
         .read(buffer)
@@ -148,13 +185,21 @@ impl FileCopy {
     match bytes_read_result {
       Ok(value) => Ok(value as u64),
       Err(e) => {
-        let _ = tx.send(FileStatus::Failed(FailedReason::ReadFailed(e.to_string(), progress_bar.clone())));
+        let _ =
+          tx.send(
+            FileStatus::Failed(
+              FailedReason::ReadFailed(
+                FileName::new(file),
+                CopyError::new(&e.to_string()),
+                progress_bar.clone())
+            )
+          );
         Err(())
       }
     }
   }
 
-  async fn write_to_destination(destination_file: &mut File, read_buffer: &[u8], tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<()> {
+  async fn write_to_destination(file: &str, destination_file: &mut File, read_buffer: &[u8], tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<()> {
       let bytes_written_result =
         destination_file
           .write(read_buffer)
@@ -163,7 +208,16 @@ impl FileCopy {
       let bytes_written = match bytes_written_result {
         Ok(value) => value as u64,
         Err(e) => {
-          let _ = tx.send(FileStatus::Failed(FailedReason::WriteFailed(e.to_string(), progress_bar.clone())));
+          let _ =
+            tx.send(
+              FileStatus::Failed(
+                FailedReason::WriteFailed(
+                  FileName::new(file),
+                  CopyError::new(&e.to_string()),
+                  progress_bar.clone()
+                )
+              )
+            );
 
           return Err(())
         }
@@ -178,7 +232,7 @@ impl FileCopy {
       Ok(())
   }
 
-  async fn complete_file_copy(destination_file: &mut File, file_size: u64, tx: &Sender<FileStatus>, progress_bar: &MyProgressBar, file_name: String) -> R<()> {
+  async fn complete_file_copy(file: &str, destination_file: &mut File, file_size: u64, tx: &Sender<FileStatus>, progress_bar: &MyProgressBar, file_name: String) -> R<()> {
 
       let _ = tx.send(FileStatus::Flushing(progress_bar.clone()));
 
@@ -188,34 +242,51 @@ impl FileCopy {
       match flush_result {
         Ok(_) => (),
         Err(e) => {
-          let _ = tx.send(FileStatus::Failed(FailedReason::FlushFailed(e.to_string(), progress_bar.clone())));
+          let _ =
+            tx.send(
+              FileStatus::Failed(
+                FailedReason::FlushFailed(
+                  FileName::new(file),
+                  e.into(),
+                  progress_bar.clone())
+              )
+            );
         }
       };
 
       let _ = tx.send(FileStatus::CopyComplete(Complete::new(progress_bar)));
 
-      let dest_file_size = Self::get_file_length(destination_file, FileType::Destination, tx, progress_bar).await?;
+      let dest_file_size = Self::get_file_length(file, destination_file, FileType::Destination, tx, progress_bar).await?;
 
-      Self::compare_file_sizes(file_size, dest_file_size, &tx, &progress_bar).await?;
+      Self::compare_file_sizes(file, file_size, dest_file_size, &tx, &progress_bar).await?;
       Self::succeed(&tx, &progress_bar, file_name).await?;
 
       Ok(())
   }
 
 
-  async fn compare_file_sizes(source_file_size: u64, destination_file_size: u64, tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<()> {
+  async fn compare_file_sizes(file: &str, source_file_size: u64, destination_file_size: u64, tx: &Sender<FileStatus>, progress_bar: &MyProgressBar) -> R<()> {
 
     if source_file_size == destination_file_size {
       let _ = tx.send(FileStatus::FileSizesMatch(progress_bar.clone()));
     } else {
-      let _ = tx.send(FileStatus::Failed(FailedReason::FileSizesAreDifferent(source_file_size, destination_file_size, progress_bar.clone())));
+      let _ =
+        tx.send(
+          FileStatus::Failed(
+            FailedReason::FileSizesAreDifferent(
+              FileName::new(file),
+              SizeComparison::new(source_file_size, destination_file_size),
+              progress_bar.clone()
+            )
+          )
+        );
     }
 
     Ok(())
   }
 
   async fn succeed(tx: &Sender<FileStatus>, progress_bar: &MyProgressBar, file_name: String) -> R<()> {
-    let _ = tx.send(FileStatus::Success(file_name, progress_bar.clone()));
+    let _ = tx.send(FileStatus::Success(FileName::new(&file_name), progress_bar.clone()));
 
     Ok(())
   }

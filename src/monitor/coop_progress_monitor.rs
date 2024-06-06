@@ -4,7 +4,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::sync::broadcast::Receiver;
 use std::sync::atomic;
 
-use crate::model::{R, FileStatus};
+use crate::model::{CopyError, FailedReason, FileName, FileStatus, R};
 
 pub struct CoopProgressMonitor {
   progress: ProgressBar,
@@ -87,19 +87,17 @@ impl CoopProgressMonitor {
             self.progress.finish()
           }
 
-          self.insert_completed_bar(&file_name)
+          self.insert_completed_bar(&file_name.name())
         },
 
-        FileStatus::Failed(..) => {
-          let completed = self.completed.get_mut();
-          *completed += 1;
-          self.progress.inc(1);
-
-          // If all items are completed, then finish
-          if *completed >= self.items {
-            self.progress.finish()
-          }
-        },
+        FileStatus::Failed(FailedReason::ReadFailed(file_name, error, _)) => self.handle_failed(file_name, error),
+        FileStatus::Failed(FailedReason::WriteFailed(file_name, error, _)) => self.handle_failed(file_name, error),
+        FileStatus::Failed(FailedReason::FlushFailed(file_name, error, _)) => self.handle_failed(file_name, error),
+        FileStatus::Failed(FailedReason::CouldNotReadSourceFile(file_name, error, _)) => self.handle_failed(file_name, error),
+        FileStatus::Failed(FailedReason::CouldNotGetFileSize(file_name, error, _, _)) => self.handle_failed(file_name, error),
+        FileStatus::Failed(FailedReason::CouldNotCreateDestinationFile(file_name, error, _)) => self.handle_failed(file_name, error),
+        FileStatus::Failed(FailedReason::CouldNotCreateDestinationDir(file_name, error, _)) => self.handle_failed(file_name, error),
+        FileStatus::Failed(FailedReason::FileSizesAreDifferent(file_name, _, _)) => self.handle_failed(file_name, CopyError::new("File sizes are different")),
 
         _ => ()
      }
@@ -110,10 +108,32 @@ impl CoopProgressMonitor {
     Ok(())
   }
 
+  fn handle_failed(&mut self, file: FileName, error: CopyError) {
+    let completed = self.completed.get_mut();
+    *completed += 1;
+    self.progress.inc(1);
+
+    // If all items are completed, then finish
+    if *completed >= self.items {
+      self.progress.finish()
+    }
+
+    self.insert_failed_bar(&file.name(), &error.error());
+  }
+
   fn insert_completed_bar(&mut self, arg: &str) {
     let current_index = self.completed_index.load(atomic::Ordering::Relaxed);
     if let Some(pb) = self.completed_items.get(current_index as usize) {
-      pb.set_prefix(arg.to_owned());
+      pb.set_prefix(format!("{arg} ✅"));
+      let next_index = self.completed_index.get_mut();
+      *next_index += 1;
+    }
+  }
+
+  fn insert_failed_bar(&mut self, arg: &str, error: &str) {
+    let current_index = self.completed_index.load(atomic::Ordering::Relaxed);
+    if let Some(pb) = self.completed_items.get(current_index as usize) {
+      pb.set_prefix(format!("{arg} ({}) ❌", error));
       let next_index = self.completed_index.get_mut();
       *next_index += 1;
     }

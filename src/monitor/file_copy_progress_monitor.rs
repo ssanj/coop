@@ -35,47 +35,47 @@ impl FileCopyProgressMonitor {
 
           FileStatus::Success(..) => (),
 
-          FileStatus::Failed(FailedReason::ReadFailed(reason, pb)) => {
-            pb.set_error(&format!("❌ Read failed: {}", reason))
+          FileStatus::Failed(FailedReason::ReadFailed(_, reason, pb)) => {
+            pb.set_error(&format!("❌ Read failed: {}", reason.message()))
           },
 
-          FileStatus::Failed(FailedReason::WriteFailed(reason, pb)) => {
-            pb.set_error(&format!("❌ Write failed: {}", reason))
+          FileStatus::Failed(FailedReason::WriteFailed(_, reason, pb)) => {
+            pb.set_error(&format!("❌ Write failed: {}", reason.message()))
           },
 
-          FileStatus::Failed(FailedReason::CouldNotGetFileSize(reason, FileType::Source, pb)) => {
+          FileStatus::Failed(FailedReason::CouldNotGetFileSize(_, reason, FileType::Source, pb)) => {
             pb.set_status("calculating source file length...");
-            pb.set_error(&format!("❌ Could not get source file size: {}", reason))
+            pb.set_error(&format!("❌ Could not get source file size: {}", reason.error()))
           },
 
-          FileStatus::Failed(FailedReason::CouldNotGetFileSize(reason, FileType::Destination, pb)) => {
+          FileStatus::Failed(FailedReason::CouldNotGetFileSize(_, reason, FileType::Destination, pb)) => {
             pb.set_status("calculating destination file length...");
-            pb.set_error(&format!("❌ Could not get destination file size: {}", reason))
+            pb.set_error(&format!("❌ Could not get destination file size: {}", reason.error()))
           },
 
-          FileStatus::Failed(FailedReason::CouldNotCreateDestinationFile(reason, pb)) => {
+          FileStatus::Failed(FailedReason::CouldNotCreateDestinationFile(_, reason, pb)) => {
             pb.set_status("creating destination file...");
-            pb.set_error(&format!("❌ Could not create destination file: {}", reason))
+            pb.set_error(&format!("❌ Could not create destination file: {}", reason.error()))
           },
 
-          FileStatus::Failed(FailedReason::CouldNotCreateDestinationDir(reason, pb)) => {
+          FileStatus::Failed(FailedReason::CouldNotCreateDestinationDir(_, reason, pb)) => {
             pb.set_status("creating destination dir...");
-            pb.set_error(&format!("❌ Could not create destination dir: {}", reason))
+            pb.set_error(&format!("❌ Could not create destination dir: {}", reason.error()))
           },
 
-          FileStatus::Failed(FailedReason::CouldNotReadSourceFile(reason, pb)) => {
+          FileStatus::Failed(FailedReason::CouldNotReadSourceFile(_, reason, pb)) => {
             pb.set_status("opening source file...");
-            pb.set_error(&format!("❌ Could not read source file: {}", reason))
+            pb.set_error(&format!("❌ Could not read source file: {}", reason.error()))
           },
 
-          FileStatus::Failed(FailedReason::FileSizesAreDifferent(source, dest, pb)) => {
+          FileStatus::Failed(FailedReason::FileSizesAreDifferent(_, comparison, pb)) => {
             pb.set_status("comparing source and destination file sizes...");
-            pb.set_error(&format!("❌ File sizes are different. src:{source}, dst:{dest}"))
+            pb.set_error(&format!("❌ File sizes are different. src:{}, dst:{}", comparison.source_size(), comparison.destination_size()))
           },
 
-          FileStatus::Failed(FailedReason::FlushFailed(reason, pb)) => {
+          FileStatus::Failed(FailedReason::FlushFailed(_, reason, pb)) => {
             pb.set_status("flushing destination to disk...");
-            pb.set_error(&format!("❌ Flushing destination file failed: {}", reason))
+            pb.set_error(&format!("❌ Flushing destination file failed: {}", reason.error()))
           },
         }
       }
