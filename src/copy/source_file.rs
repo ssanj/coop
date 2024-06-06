@@ -5,12 +5,13 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub struct SourceFile {
   full: PathBuf,
-  relative: PathBuf
+  relative: PathBuf,
+  size: u64
 }
 
 impl SourceFile {
 
-  fn new<P: AsRef<Path>>(source_dir: P, de: DirEntry) -> Option<Self> {
+  fn new<P: AsRef<Path>>(source_dir: P, de: DirEntry, size: u64) -> Option<Self> {
     let full = de.path().to_owned();
     de.
       into_path()
@@ -19,7 +20,8 @@ impl SourceFile {
       .map(|rel| {
         Self {
           full,
-          relative: rel.to_owned()
+          relative: rel.to_owned(),
+          size
         }
       })
   }
@@ -32,8 +34,13 @@ impl SourceFile {
     self.relative.to_string_lossy().to_string()
   }
 
+
   pub fn full_path(&self) -> &Path {
     self.full.as_path()
+  }
+
+  pub fn size(&self) -> u64 {
+    self.size
   }
 
   pub fn get_source_files(source_dir: &PathBuf, ignored_regexes: &Vec<Regex>) -> Vec<SourceFile> {
@@ -47,7 +54,14 @@ impl SourceFile {
             // We might want to filter out certain files like .DS_Store
             d.file_type().is_file() && !Self::ignored(ignored_regexes, d)
           })
-          .and_then(|file| SourceFile::new(source_dir, file))
+          .and_then(|file| {
+            file
+              .metadata()
+              .ok()
+              .and_then(|meta| {
+                SourceFile::new(source_dir, file, meta.len())
+              })
+          })
       })
       .collect()
   }
