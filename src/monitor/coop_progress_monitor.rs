@@ -112,6 +112,7 @@ impl CoopProgressMonitor {
     let completed = self.completed.get_mut();
     *completed += 1;
     self.progress.inc(1);
+    self.progress.set_prefix(format!("{}/{}", completed, self.items));
 
     // If all items are completed, then finish
     if *completed >= self.items {

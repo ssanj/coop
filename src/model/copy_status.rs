@@ -36,7 +36,7 @@ impl FileName {
 
 impl <P: AsRef<Path>>From<P> for FileName {
   fn from(path: P) -> Self {
-    FileName(path.as_ref().to_string_lossy().to_string())
+    FileName(path.as_ref().file_name().map(|p| p.to_string_lossy().to_string()).unwrap_or("<unknown>".to_owned()))
   }
 }
 
