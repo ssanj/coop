@@ -1,8 +1,4 @@
 use std::path::Path;
-
-use clap::Error;
-use serde_json::error;
-
 use crate::progress::MyProgressBar;
 
 #[derive(Debug, Clone)]

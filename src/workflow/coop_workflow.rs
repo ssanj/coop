@@ -1,5 +1,4 @@
 use std::cmp::{max, min};
-use std::sync::Arc;
 use std::time::Instant;
 
 use indicatif::MultiProgress;
@@ -44,7 +43,7 @@ impl CoopWorkflow {
         destination_dir.to_str().unwrap_or("<Unknown>")
       );
 
-    let _ = match selection {
+    match selection {
       UserResult::Continue => (),
       _ => return
     };
@@ -85,6 +84,6 @@ impl CoopWorkflow {
     drop(tx);
 
     // Wait for any running tasks to complete
-    while let Some(_) = join_set.join_next().await {}
+    while join_set.join_next().await.is_some() {}
   }
 }

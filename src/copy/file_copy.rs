@@ -258,8 +258,8 @@ impl FileCopy {
 
       let dest_file_size = Self::get_file_length(file, destination_file, FileType::Destination, tx, progress_bar).await?;
 
-      Self::compare_file_sizes(file, file_size, dest_file_size, &tx, &progress_bar).await?;
-      Self::succeed(&tx, &progress_bar, file_name).await?;
+      Self::compare_file_sizes(file, file_size, dest_file_size, tx, progress_bar).await?;
+      Self::succeed(tx, progress_bar, file_name).await?;
 
       Ok(())
   }

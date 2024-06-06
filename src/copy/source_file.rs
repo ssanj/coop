@@ -43,7 +43,7 @@ impl SourceFile {
     self.size
   }
 
-  pub fn get_source_files(source_dir: &PathBuf, ignored_regexes: &Vec<Regex>) -> Vec<SourceFile> {
+  pub fn get_source_files(source_dir: &PathBuf, ignored_regexes: &[Regex]) -> Vec<SourceFile> {
     WalkDir::new(source_dir)
       .into_iter()
       .filter_map(|de| {
@@ -68,7 +68,7 @@ impl SourceFile {
 
   fn ignored(ignored_regexes: &[Regex], de: &DirEntry) -> bool {
     ignored_regexes
-      .into_iter()
+      .iter()
       .any(|r| r.is_match(de.path().to_string_lossy().as_ref()))
   }
 }

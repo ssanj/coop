@@ -19,7 +19,6 @@ impl CoopProgressMonitor {
   pub fn new(multi: &MultiProgress, size: u64) -> Self {
     let completed_items =
       (0..size)
-        .into_iter()
         .map(|_| {
           let pb = Self::create_completed_progress_bar();
           multi.add(pb.clone())
@@ -59,7 +58,7 @@ impl CoopProgressMonitor {
     self.progress.tick();
     let timer_handle = {
       let pb = self.progress.clone();
-      let h = thread::spawn(move || {
+      thread::spawn(move || {
         while !pb.is_finished() {
           let current_time = Instant::now();
           let duration = current_time.duration_since(start_time);
@@ -70,13 +69,12 @@ impl CoopProgressMonitor {
           pb.set_message(format!("{:02}:{:02}:{:02}.{:02}", hours, minutes, seconds, millis));
           thread::sleep(Duration::from_millis(250));
         }
-      });
-      h
+      })
     };
 
     while let Ok(value) = rx.recv().await {
       match value {
-        FileStatus::Success(file_name, pb) => {
+        FileStatus::Success(file_name, _) => {
           let completed = self.completed.get_mut();
           *completed += 1;
           self.progress.inc(1);
