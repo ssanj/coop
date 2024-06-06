@@ -1,5 +1,3 @@
-use std::sync::Mutex;
-
 use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
 
 #[derive(Debug, Clone)]
@@ -12,7 +10,7 @@ pub struct MyProgressBar {
 
 impl MyProgressBar {
   pub fn new(multi: &MultiProgress) -> Self {
-    let primary_style = ProgressStyle::with_template("[{elapsed_precise}] [{wide_bar:.green}] {bytes:.green}/{total_bytes} ({bytes_per_sec}, {eta})").unwrap();
+    let primary_style = ProgressStyle::with_template("[{wide_bar:.green}] {bytes:.green}/{total_bytes} ({bytes_per_sec}, {eta})").unwrap();
     let primary =
       ProgressBar::new(0)
       .with_style(primary_style)
