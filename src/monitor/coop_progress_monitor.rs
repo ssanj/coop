@@ -131,8 +131,6 @@ impl CoopProgressMonitor {
     if let Some(pb) = state.completed_item_bars.get(current_index as usize) {
       pb.set_prefix(arg);
       state.completed_index += 1;
-    } else {
-      panic!("none!")
     }
   }
 
