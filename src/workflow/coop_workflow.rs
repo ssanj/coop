@@ -56,7 +56,7 @@ impl CoopWorkflow {
         .map(|f| FileCopy::new(f, destination_dir, &multi) )
         .collect();
 
-    let (tx, rx) = broadcast::channel::<FileStatus>(256);
+    let (tx, rx) = broadcast::channel::<FileStatus>(1024000);
     let rx2 = tx.subscribe();
 
     let copy_monitor_fut = FileCopyProgressMonitor::monitor(rx);

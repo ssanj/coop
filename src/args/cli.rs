@@ -14,19 +14,19 @@ pub struct Args {
    pub verbose: bool,
 
    /// Source directory to copy files from
-   #[arg(short,long)]
+   #[arg(short, long)]
    pub source_dir: PathBuf,
 
    /// Destination directory to copy files to
-   #[arg(short,long)]
+   #[arg(short, long)]
    pub destination_dir: PathBuf,
 
    /// The maximum number of file copies to perform concurrently (1-256).
-   #[arg(short,long, default_value="4", value_parser=clap::value_parser!(u8).range(1..256))]
+   #[arg(short, long, default_value="4", value_parser=clap::value_parser!(u8).range(1..256))]
    pub concurrency: u8,
 
    /// The maximum buffer size to use when copying. Maximum of 1024KB or 128MB. [default: 1MB]
-   #[arg(short,long, value_parser = clap::value_parser!(BufferSize))]
+   #[arg(short, long, value_parser = clap::value_parser!(BufferSize))]
    pub buffer_size: Option<BufferSize>,
 
    /// Files to ignore during copy.
@@ -37,8 +37,12 @@ pub struct Args {
    /// Example: --ignore '.git'
    ///
    /// Note: When ignores are supplied the defaults are not used.
-   #[arg(short,long, default_values=[".DS_Store", ".git", "/target"])]
+   #[arg(short, long, default_values=[".DS_Store", ".git", "/target"])]
    pub ignore: Vec<Regex>,
+
+   /// Skip asking verification on copy
+   #[arg(long)]
+   pub skip_verify: bool
 }
 
 pub fn get_cli_args() -> Args {
