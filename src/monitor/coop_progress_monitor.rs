@@ -1,29 +1,35 @@
-use std::{sync::atomic::AtomicU64, thread, time::{Duration, Instant}};
+use std::borrow::BorrowMut;
+use std::sync::{Mutex, MutexGuard};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::sync::broadcast::Receiver;
-use std::sync::atomic;
 
 use crate::model::{CopyError, FailedReason, FileName, FileStatus, R};
+
+struct State {
+  completed: u64,
+  completed_index: u64,
+  completed_item_bars: Vec<ProgressBar>,
+}
 
 pub struct CoopProgressMonitor {
   progress: ProgressBar,
   items: u64,
-  completed: AtomicU64,
-  completed_index: AtomicU64,
-  completed_items: Vec<ProgressBar>,
+  state: Mutex<State>,
 }
 
 impl CoopProgressMonitor {
 
   pub fn new(multi: &MultiProgress, size: u64) -> Self {
-    let completed_items =
+    let completed_item_bars =
       (0..size)
-        .map(|_| {
-          let pb = Self::create_completed_progress_bar();
-          multi.add(pb.clone())
-        })
-        .collect();
+      .map(|_| {
+        let pb = Self::create_completed_progress_bar();
+        multi.add(pb.clone())
+      })
+      .collect();
 
     let overall_bar =
       ProgressStyle::with_template("[{msg}] overall progress: {prefix} [{wide_bar:.green}]").unwrap();
@@ -36,12 +42,19 @@ impl CoopProgressMonitor {
     // Add this at the end
     multi.add(overall_bar.clone());
 
+    let state =
+      Mutex::new(
+        State {
+          completed: 0,
+          completed_index: 0,
+          completed_item_bars,
+        }
+      );
+
     Self {
       progress: overall_bar,
       items: size,
-      completed: AtomicU64::new(0),
-      completed_index: AtomicU64::new(0),
-      completed_items
+      state
     }
   }
 
@@ -55,7 +68,7 @@ impl CoopProgressMonitor {
   }
 
   pub async fn monitor(mut self, mut rx: Receiver<FileStatus>, start_time: Instant) -> R<()> {
-    self.progress.tick();
+    self.progress.set_prefix(format!("{}/{}", 0, self.items));
     let timer_handle = {
       let pb = self.progress.clone();
       thread::spawn(move || {
@@ -66,7 +79,7 @@ impl CoopProgressMonitor {
           let seconds = duration.as_secs();
           let minutes = seconds / 60;
           let hours = minutes / 60;
-          pb.set_message(format!("{:02}:{:02}:{:02}.{:02}", hours, minutes, seconds, millis));
+          pb.set_message(format!("{:02}:{:02}:{:02}.{:03}", hours, minutes % 60, seconds % 60, millis % 1000));
           thread::sleep(Duration::from_millis(250));
         }
       })
@@ -75,17 +88,7 @@ impl CoopProgressMonitor {
     while let Ok(value) = rx.recv().await {
       match value {
         FileStatus::Success(file_name, _) => {
-          let completed = self.completed.get_mut();
-          *completed += 1;
-          self.progress.inc(1);
-          self.progress.set_prefix(format!("{}/{}", completed, self.items));
-
-          // If all items are completed, then finish
-          if *completed >= self.items {
-            self.progress.finish()
-          }
-
-          self.insert_completed_bar(&file_name.name())
+          self.handle_succeeded(file_name)
         },
 
         FileStatus::Failed(FailedReason::ReadFailed(file_name, error, _)) => self.handle_failed(file_name, error),
@@ -106,36 +109,46 @@ impl CoopProgressMonitor {
     Ok(())
   }
 
+
+  fn handle_succeeded(&mut self, file: FileName) {
+    self.handle_end_state(|state| Self::insert_completed_bar(&file.name(), state))
+  }
+
   fn handle_failed(&mut self, file: FileName, error: CopyError) {
-    let completed = self.completed.get_mut();
-    *completed += 1;
+    self.handle_end_state(|state| Self::insert_failed_bar(&file.name(), &error.error(), state))
+  }
+
+  fn insert_completed_bar(arg: &str, state: &mut MutexGuard<State>) {
+    Self::insert_bar(format!("{arg} ✅"), state)
+  }
+
+  fn insert_failed_bar(arg: &str, error: &str, state: &mut MutexGuard<State>) {
+    Self::insert_bar(format!("{arg} ({}) ❌", error), state)
+  }
+
+  fn insert_bar(arg: String, state: &mut MutexGuard<State>) {
+    let current_index = state.completed_index;
+    if let Some(pb) = state.completed_item_bars.get(current_index as usize) {
+      pb.set_prefix(arg);
+      state.completed_index += 1;
+    } else {
+      panic!("none!")
+    }
+  }
+
+  fn handle_end_state<F: FnOnce(&mut MutexGuard<State>)>(&mut self, update_completed_display: F) {
+    let mut state_guard = self.state.lock().unwrap();
+    state_guard.completed += 1;
     self.progress.inc(1);
-    self.progress.set_prefix(format!("{}/{}", completed, self.items));
+    self.progress.set_prefix(format!("{}/{}", state_guard.completed, self.items));
 
     // If all items are completed, then finish
-    if *completed >= self.items {
-      self.progress.finish()
+    if state_guard.completed >= self.items {
+      self.progress.finish();
     }
 
-    self.insert_failed_bar(&file.name(), &error.error());
+    update_completed_display(&mut state_guard)
   }
 
-  fn insert_completed_bar(&mut self, arg: &str) {
-    let current_index = self.completed_index.load(atomic::Ordering::Relaxed);
-    if let Some(pb) = self.completed_items.get(current_index as usize) {
-      pb.set_prefix(format!("{arg} ✅"));
-      let next_index = self.completed_index.get_mut();
-      *next_index += 1;
-    }
-  }
-
-  fn insert_failed_bar(&mut self, arg: &str, error: &str) {
-    let current_index = self.completed_index.load(atomic::Ordering::Relaxed);
-    if let Some(pb) = self.completed_items.get(current_index as usize) {
-      pb.set_prefix(format!("{arg} ({}) ❌", error));
-      let next_index = self.completed_index.get_mut();
-      *next_index += 1;
-    }
-  }
 }
 

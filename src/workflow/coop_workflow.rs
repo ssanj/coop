@@ -33,20 +33,24 @@ impl CoopWorkflow {
     let ignored_regexes = &args.ignore;
     let concurrency = args.concurrency as u16;
     let buffer_size = args.buffer_size.unwrap_or(BufferSize::DEFAULT_BUFFER_SIZE);
+    let skip_verification = args.skip_verify;
 
     let files_to_copy = SourceFile::get_source_files(source_dir, ignored_regexes);
-    let selection =
-      CoopConsole::show_copy_state(
-        &files_to_copy,
-        concurrency,
-        &buffer_size,
-        destination_dir.to_str().unwrap_or("<Unknown>")
-      );
 
-    match selection {
-      UserResult::Continue => (),
-      _ => return
-    };
+    if !skip_verification {
+      let selection =
+        CoopConsole::show_copy_state(
+          &files_to_copy,
+          concurrency,
+          &buffer_size,
+          destination_dir.to_str().unwrap_or("<Unknown>")
+        );
+
+      match selection {
+        UserResult::Continue => (),
+        _ => return
+      };
+    }
 
     let multi = MultiProgress::new();
 
