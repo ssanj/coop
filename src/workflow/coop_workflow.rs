@@ -64,7 +64,9 @@ impl CoopWorkflow {
     let (tx, rx) = broadcast::channel::<FileStatus>(1000);
     let rx2 = tx.subscribe();
 
-    let (txp, rxp) = mpsc::channel::<InProgress>(1000000); // Allow up to 1 million progress messages before blocking
+    // Allow up to 100,000 progress messages before blocking
+    // Depending on the buffer size, the number of progress updates/s can be huge
+    let (txp, rxp) = mpsc::channel::<InProgress>(100000);
 
     let copy_monitor_fut = FileCopyProgressMonitor::monitor(rx);
 
@@ -91,7 +93,7 @@ impl CoopWorkflow {
       }
     };
 
-    // This is an extra tx, drop it so the execution can complete
+    // Drop senders so the execution can complete
     drop(tx);
     drop(txp);
 
