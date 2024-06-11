@@ -1,10 +1,12 @@
 use tokio::sync::broadcast::Receiver;
 use crate::model::{R, FileStatus, FileType, FailedReason};
 
-pub struct FileCopyProgressMonitor;
+/// Monitors lifecyle events of all file copies in progress.
+pub struct LifecycleEventMonitor;
 
-impl FileCopyProgressMonitor {
+impl LifecycleEventMonitor {
 
+   /// This is a low cardinality event receiver.
    pub async fn monitor(mut rx: Receiver<FileStatus>) -> R<()> {
       while let Ok(value) = rx.recv().await {
         match value {

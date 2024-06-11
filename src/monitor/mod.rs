@@ -1,9 +1,9 @@
-mod file_copy_progress_monitor;
-mod coop_progress_monitor;
-mod file_state_progress_monitor;
+mod lifecycle_event_monitor;
+mod overall_progress_monitor;
+mod file_inprogress_monitor;
 mod monitor_mux;
 
-pub use file_copy_progress_monitor::FileCopyProgressMonitor;
-pub use coop_progress_monitor::CoopProgressMonitor;
+pub use lifecycle_event_monitor::LifecycleEventMonitor;
+pub use overall_progress_monitor::OverallProgressMonitor;
 pub use monitor_mux::MonitorMux;
-pub use file_state_progress_monitor::FileStateProgressMonitor;
+pub use file_inprogress_monitor::FileInProgressMonitor;

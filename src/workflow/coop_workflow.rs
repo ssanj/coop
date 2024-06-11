@@ -1,5 +1,5 @@
-use std::cmp::{max, min};
 use std::time::Instant;
+use std::cmp::{max, min};
 
 use indicatif::MultiProgress;
 use tokio::sync::broadcast::{self};
@@ -11,9 +11,7 @@ use crate::cli::Args;
 use crate::console::{CoopConsole, UserResult};
 use crate::copy::{FileCopy, SourceFile};
 use crate::model::{FileStatus, InProgress};
-use crate::monitor::{CoopProgressMonitor, FileCopyProgressMonitor, MonitorMux, FileStateProgressMonitor};
-
-// static MULTI: Lazy<MultiProgress> = Lazy::new(|| MultiProgress::new());
+use crate::monitor::{OverallProgressMonitor, LifecycleEventMonitor, MonitorMux, FileInProgressMonitor};
 
 pub struct CoopWorkflow {
   args: Args
@@ -61,24 +59,26 @@ impl CoopWorkflow {
         .map(|f| FileCopy::new(f, destination_dir, &multi) )
         .collect();
 
+    // For low cardinality events
     let (tx, rx) = broadcast::channel::<FileStatus>(1000);
     let rx2 = tx.subscribe();
 
+    // For high cardinality events.
     // Allow up to 100,000 progress messages before blocking
     // Depending on the buffer size, the number of progress updates/s can be huge
     let (txp, rxp) = mpsc::channel::<InProgress>(100000);
 
-    let copy_monitor_fut = FileCopyProgressMonitor::monitor(rx);
+    let lifecycle_event_monitor_fut = LifecycleEventMonitor::monitor(rx);
 
-    let coop_monitor = CoopProgressMonitor::new(&multi, copy_tasks.len() as u64);
-    let coop_monitor_fut = coop_monitor.monitor(rx2, Instant::now());
+    let overall_monitor = OverallProgressMonitor::new(&multi, copy_tasks.len() as u64);
+    let overall_monitor_fut = overall_monitor.monitor(rx2, Instant::now());
 
-    let progress_monitor_fut = FileStateProgressMonitor::monitor(rxp);
+    let progress_monitor_fut = FileInProgressMonitor::monitor(rxp);
 
     let mut join_set = JoinSet::new();
     // Start the monitors first, so we don't miss any messages
-    join_set.spawn(copy_monitor_fut);
-    join_set.spawn(coop_monitor_fut);
+    join_set.spawn(lifecycle_event_monitor_fut);
+    join_set.spawn(overall_monitor_fut);
     join_set.spawn(progress_monitor_fut);
 
     let mut running = 0_u16;

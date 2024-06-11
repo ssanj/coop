@@ -218,7 +218,7 @@ dependencies = [
 
 [[package]]
 name = "coop"
-version = "0.22.3"
+version = "0.22.4"
 dependencies = [
  "ansi_term",
  "assert_cmd",

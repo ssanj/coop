@@ -13,13 +13,14 @@ struct State {
   completed_item_bars: Vec<ProgressBar>,
 }
 
-pub struct CoopProgressMonitor {
+/// Monitors the overall progress of all file copies in progress
+pub struct OverallProgressMonitor {
   progress: ProgressBar,
   items: u64,
   state: Mutex<State>,
 }
 
-impl CoopProgressMonitor {
+impl OverallProgressMonitor {
 
   pub fn new(multi: &MultiProgress, size: u64) -> Self {
     let completed_item_bars =
@@ -66,6 +67,7 @@ impl CoopProgressMonitor {
     .with_finish(indicatif::ProgressFinish::Abandon)
   }
 
+  /// This is a low cardinality event receiver.
   pub async fn monitor(mut self, mut rx: Receiver<FileStatus>, start_time: Instant) -> R<()> {
     self.progress.set_prefix(format!("{}/{}", 0, self.items));
     let timer_handle = {
