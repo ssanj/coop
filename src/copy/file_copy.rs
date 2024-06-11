@@ -2,11 +2,10 @@ use std::path::{Path, PathBuf};
 use indicatif::MultiProgress;
 use tokio::fs::{DirBuilder, File};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::sync::broadcast::Sender;
 
 use crate::monitor::MonitorMux;
 use crate::progress::MyProgressBar;
-use crate::model::{Complete, CopyError, FailedReason, FileName, FileStatus, FileType, InProgress, SizeComparison, R};
+use crate::model::{FileType, SizeComparison, R};
 use crate::args::BufferSize;
 use super::SourceFile;
 
@@ -63,14 +62,14 @@ impl FileCopy {
     let mut buffer = vec![0; buf_size];
 
     loop {
-      let bytes_read = Self::read_to_buffer(file_name, &mut source_file, &mut buffer, &mux, &progress_bar).await?;
+      let bytes_read = Self::read_to_buffer(file_name, &mut source_file, &mut buffer, &mux, progress_bar).await?;
 
       if bytes_read == 0 {
-        Self::complete_file_copy(file_name, &mut destination_file, file_size, &mux, &progress_bar, self.source_file_name().as_str()).await?;
+        Self::complete_file_copy(file_name, &mut destination_file, file_size, &mux, progress_bar, self.source_file_name().as_str()).await?;
         return Ok(())
       }
 
-      Self::write_to_destination(file_name, &mut destination_file, &buffer[..bytes_read as usize], &mux, &progress_bar).await?;
+      Self::write_to_destination(file_name, &mut destination_file, &buffer[..bytes_read as usize], &mux, progress_bar).await?;
     }
   }
 
@@ -187,7 +186,7 @@ impl FileCopy {
     let dest_file_size = Self::get_file_length(file, destination_file, FileType::Destination, mux, progress_bar).await?;
 
     Self::compare_file_sizes(file, file_size, dest_file_size, mux, progress_bar).await?;
-    Self::succeed(mux, progress_bar, &file_name).await?;
+    Self::succeed(mux, progress_bar, file_name).await?;
 
     Ok(())
   }
@@ -205,7 +204,7 @@ impl FileCopy {
   }
 
   async fn succeed(mux: &MonitorMux, progress_bar: &MyProgressBar, file_name: &str) -> R<()> {
-    mux.send_success(&file_name, progress_bar);
+    mux.send_success(file_name, progress_bar);
     Ok(())
   }
 }

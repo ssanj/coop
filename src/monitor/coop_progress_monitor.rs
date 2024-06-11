@@ -1,4 +1,3 @@
-use std::borrow::BorrowMut;
 use std::sync::{Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
