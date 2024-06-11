@@ -3,14 +3,15 @@ use std::time::Instant;
 
 use indicatif::MultiProgress;
 use tokio::sync::broadcast::{self};
+use tokio::sync::mpsc::{self};
 use tokio::task::JoinSet;
 
 use crate::args::BufferSize;
 use crate::cli::Args;
 use crate::console::{CoopConsole, UserResult};
 use crate::copy::{FileCopy, SourceFile};
-use crate::model::FileStatus;
-use crate::monitor::{CoopProgressMonitor, FileCopyProgressMonitor};
+use crate::model::{FileStatus, InProgress};
+use crate::monitor::{CoopProgressMonitor, FileCopyProgressMonitor, MonitorMux, FileStateProgressMonitor};
 
 // static MULTI: Lazy<MultiProgress> = Lazy::new(|| MultiProgress::new());
 
@@ -60,21 +61,27 @@ impl CoopWorkflow {
         .map(|f| FileCopy::new(f, destination_dir, &multi) )
         .collect();
 
-    let (tx, rx) = broadcast::channel::<FileStatus>(1024000);
+    let (tx, rx) = broadcast::channel::<FileStatus>(1000);
     let rx2 = tx.subscribe();
 
+    let (txp, rxp) = mpsc::channel::<InProgress>(1000000); // Allow up to 1 million progress messages before blocking
+
     let copy_monitor_fut = FileCopyProgressMonitor::monitor(rx);
+
     let coop_monitor = CoopProgressMonitor::new(&multi, copy_tasks.len() as u64);
     let coop_monitor_fut = coop_monitor.monitor(rx2, Instant::now());
+
+    let progress_monitor_fut = FileStateProgressMonitor::monitor(rxp);
 
     let mut join_set = JoinSet::new();
     // Start the monitors first, so we don't miss any messages
     join_set.spawn(copy_monitor_fut);
     join_set.spawn(coop_monitor_fut);
+    join_set.spawn(progress_monitor_fut);
 
     let mut running = 0_u16;
     for task in copy_tasks {
-      join_set.spawn(task.copy(buffer_size.clone(), tx.clone())); // each task gets a copy of tx
+      join_set.spawn(task.copy(buffer_size.clone(), MonitorMux::new(tx.clone(), txp.clone()))); // each task gets a copy of tx
       running = min(running + 1, u16::MAX); // TODO: We need to tweak this value
 
       if running >= concurrency {
@@ -86,6 +93,7 @@ impl CoopWorkflow {
 
     // This is an extra tx, drop it so the execution can complete
     drop(tx);
+    drop(txp);
 
     // Wait for any running tasks to complete
     while join_set.join_next().await.is_some() {}

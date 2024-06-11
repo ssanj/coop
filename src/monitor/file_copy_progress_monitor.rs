@@ -17,13 +17,6 @@ impl FileCopyProgressMonitor {
           FileStatus::CreatedDestinationFile(pb) => pb.set_status("created destination file"),
           FileStatus::Flushing(pb) => pb.set_status("flushing destination..."),
 
-          FileStatus::CopyInProgress(progress) => {
-              let bytes_written = progress.bytes_written();
-              let pb = progress.progress_bar();
-              pb.update_progress(bytes_written);
-              pb.set_status("copying...");
-          },
-
           FileStatus::CopyComplete(complete) => {
             let pb = complete.progress_bar();
             pb.set_status("finished copying")

@@ -8,7 +8,6 @@ pub enum FileStatus {
   GotFileLength(FileType, MyProgressBar),
   GettingFileLength(FileType, MyProgressBar),
   CreatedDestinationFile(MyProgressBar),
-  CopyInProgress(InProgress),
   CopyComplete(Complete),
   FileSizesMatch(MyProgressBar),
   Success(FileName, MyProgressBar),
@@ -16,7 +15,6 @@ pub enum FileStatus {
   Flushing(MyProgressBar)
 }
 
-// TODO: Add implementation functions instead of sharing fields
 #[derive(Debug, Clone)]
 pub struct FileName(String);
 
