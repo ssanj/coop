@@ -42,7 +42,6 @@ impl CopyError {
     Self(message.to_owned())
   }
 
-  // TODO: Remove, use error instead
   pub fn message(self) -> String {
     self.0
   }

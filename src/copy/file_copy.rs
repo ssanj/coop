@@ -1,3 +1,4 @@
+use std::convert::identity;
 use std::path::{Path, PathBuf};
 use indicatif::MultiProgress;
 use tokio::fs::{DirBuilder, File};
@@ -175,11 +176,7 @@ impl FileCopy {
     mux.send_flushing_destination_file(progress_bar);
     let flush_result = destination_file.flush().await;
 
-    // TODO: Rewrite this
-    match flush_result {
-      Ok(_) => (),
-      Err(e) => mux.send_flushing_to_destination_file_failed(file, e, progress_bar)
-    };
+    flush_result.map_or_else(|e| mux.send_flushing_to_destination_file_failed(file, e, progress_bar), identity);
 
     mux.send_copy_complete(progress_bar);
 

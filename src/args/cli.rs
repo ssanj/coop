@@ -33,6 +33,7 @@ pub struct Args {
    ///
    /// Can be specified multiple times.
    /// Accepts a regular expression which filters the file path from the current directory.
+   /// Only applies to sources that are directories; not files.
    ///
    /// Example: --ignore '.git'
    ///
