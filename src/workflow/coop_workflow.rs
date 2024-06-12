@@ -30,7 +30,7 @@ impl CoopWorkflow {
     let source = &args.source;
     let destination_dir = &args.destination_dir;
     let ignored_regexes = &args.ignore;
-    let concurrency = args.concurrency as u16;
+    let concurrency = args.concurrency;
     let buffer_size = args.buffer_size.unwrap_or(BufferSize::DEFAULT_BUFFER_SIZE);
     let skip_verification = args.skip_verify;
 
@@ -81,10 +81,10 @@ impl CoopWorkflow {
     join_set.spawn(overall_monitor_fut);
     join_set.spawn(progress_monitor_fut);
 
-    let mut running = 0_u16;
+    let mut running = 0_u8;
     for task in copy_tasks {
       join_set.spawn(task.copy(buffer_size.clone(), MonitorMux::new(tx.clone(), txp.clone()))); // each task gets a copy of tx
-      running = min(running + 1, u16::MAX); // TODO: We need to tweak this value
+      running = min(running + 1, concurrency);
 
       if running >= concurrency {
         // Wait for a single task to complete so we fall below the concurrency threshold

@@ -15,7 +15,7 @@ const MB: u64 = 1048576;
 const GB: u64 = 1073741824;
 
 impl CoopConsole {
-  pub fn show_copy_state(files_to_copy: &[SourceFile], concurrency: u16, buffer_size: &BufferSize, destination_dir: &str) -> UserResult {
+  pub fn show_copy_state(files_to_copy: &[SourceFile], concurrency: u8, buffer_size: &BufferSize, destination_dir: &str) -> UserResult {
     let files: Vec<(String, u64)> =
       files_to_copy
         .iter()

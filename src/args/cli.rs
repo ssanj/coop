@@ -21,8 +21,8 @@ pub struct Args {
    #[arg(short, long)]
    pub destination_dir: PathBuf,
 
-   /// The maximum number of file copies to perform concurrently (1-256).
-   #[arg(short, long, default_value="4", value_parser=clap::value_parser!(u8).range(1..256))]
+   /// The maximum number of file copies to perform concurrently (1-16).
+   #[arg(short, long, default_value="4", value_parser=clap::value_parser!(u8).range(1..16))]
    pub concurrency: u8,
 
    /// The maximum buffer size to use when copying. Maximum of 1024KB or 128MB. [default: 1MB]
