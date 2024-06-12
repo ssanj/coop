@@ -37,7 +37,8 @@ impl SourceFile {
 
   fn from_file<P: AsRef<Path>>(source_file: P, size: u64) -> Self {
     let full = source_file.as_ref().to_owned();
-    let relative = source_file.as_ref().to_owned();
+    // In case of a file, the relative path is the filename
+    let relative = full.file_name().map(PathBuf::from).unwrap();
     let file_type = FileType::File(size);
 
     Self {
@@ -50,15 +51,15 @@ impl SourceFile {
 
   /// File name
   pub fn file_name(&self) -> String {
-    self.full.file_name().unwrap().to_string_lossy().into()
+    match self.file_type {
+      FileType::File(_) => self.relative.to_string_lossy().into(),
+      FileType::Dir => self.full.file_name().unwrap().to_string_lossy().into(),
+    }
   }
 
   /// File name with subdirectories relative to the supplied source directory
   pub fn relative_path(&self) -> String {
-    match self.file_type {
-      FileType::File(_) => self.file_name(), // Files don't have a relative source directory
-      FileType::Dir => self.relative.to_string_lossy().to_string(), // Directories have a relative directory
-    }
+    self.relative.to_string_lossy().into()
   }
 
 

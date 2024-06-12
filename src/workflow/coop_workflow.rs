@@ -27,14 +27,14 @@ impl CoopWorkflow {
 
   pub async fn run(self) {
     let args = self.args;
-    let source_dir = &args.source_dir;
+    let source = &args.source;
     let destination_dir = &args.destination_dir;
     let ignored_regexes = &args.ignore;
     let concurrency = args.concurrency as u16;
     let buffer_size = args.buffer_size.unwrap_or(BufferSize::DEFAULT_BUFFER_SIZE);
     let skip_verification = args.skip_verify;
 
-    let files_to_copy = SourceFile::get_source_files(source_dir, ignored_regexes);
+    let files_to_copy = SourceFile::get_source_files(source, ignored_regexes);
 
     if !skip_verification {
       let selection =
@@ -88,6 +88,7 @@ impl CoopWorkflow {
 
       if running >= concurrency {
         // Wait for a single task to complete so we fall below the concurrency threshold
+        // This would only wait for file copy tasks, as the monitors will stay alive until the last sender is dropped
         let _ = join_set.join_next().await;
         running = max(running - 1, 0);
       }

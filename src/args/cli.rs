@@ -13,9 +13,9 @@ pub struct Args {
    #[arg(long)]
    pub verbose: bool,
 
-   /// Source directory to copy files from
+   /// Source directory or file to copy files from
    #[arg(short, long)]
-   pub source_dir: PathBuf,
+   pub source: PathBuf,
 
    /// Destination directory to copy files to
    #[arg(short, long)]
