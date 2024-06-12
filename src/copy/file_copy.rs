@@ -54,10 +54,10 @@ impl FileCopy {
 
     progress_bar.set_file_size(file_size);
     let buf_size =
-      if file_size <= buffer.value() {
+      if file_size <= buffer.bytes() {
         file_size as usize // If file_size can be contained in buffer, then use that as the buffer size and don't chunk
       } else {
-        buffer.value() as usize // If the file_size can't be contained in buffer, then chunk by buffer size
+        buffer.bytes() as usize // If the file_size can't be contained in buffer, then chunk by buffer size
       };
 
     let mut buffer = vec![0; buf_size];

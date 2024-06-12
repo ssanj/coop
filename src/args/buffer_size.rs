@@ -21,7 +21,7 @@ impl BufferSize {
   // 1MB
   pub const DEFAULT_BUFFER_SIZE: BufferSize = BufferSize(1, BufferUnit::MB);
 
-  pub fn value(&self) -> u64 {
+  pub fn bytes(&self) -> u64 {
     match self.1 {
       BufferUnit::KB => 1024 * self.0 as u64,
       BufferUnit::MB => 1048576 * self.0 as u64,
