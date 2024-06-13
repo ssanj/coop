@@ -60,20 +60,20 @@ impl CoopWorkflow {
         .collect();
 
     // For low cardinality events
-    let (tx, rx) = broadcast::channel::<FileStatus>(1000);
-    let rx2 = tx.subscribe();
+    let (file_status_sender, file_status_receiver_1) = broadcast::channel::<FileStatus>(1000);
+    let file_status_receiver_2 = file_status_sender.subscribe();
 
     // For high cardinality events.
     // Allow up to 100,000 progress messages before blocking
     // Depending on the buffer size, the number of progress updates/s can be huge
-    let (txp, rxp) = mpsc::channel::<InProgress>(100000);
+    let (progress_sender, progress_receiver) = mpsc::channel::<InProgress>(100000);
 
-    let lifecycle_event_monitor_fut = LifecycleEventMonitor::monitor(rx);
+    let lifecycle_event_monitor_fut = LifecycleEventMonitor::monitor(file_status_receiver_1);
 
     let overall_monitor = OverallProgressMonitor::new(&multi, copy_tasks.len() as u64);
-    let overall_monitor_fut = overall_monitor.monitor(rx2, Instant::now());
+    let overall_monitor_fut = overall_monitor.monitor(file_status_receiver_2, Instant::now());
 
-    let progress_monitor_fut = FileInProgressMonitor::monitor(rxp);
+    let progress_monitor_fut = FileInProgressMonitor::monitor(progress_receiver);
 
     let mut join_set = JoinSet::new();
     // Start the monitors first, so we don't miss any messages
@@ -83,7 +83,7 @@ impl CoopWorkflow {
 
     let mut running = 0_u8;
     for task in copy_tasks {
-      join_set.spawn(task.copy(buffer_size.clone(), MonitorMux::new(tx.clone(), txp.clone()))); // each task gets a copy of tx
+      join_set.spawn(task.copy(buffer_size.clone(), MonitorMux::new(file_status_sender.clone(), progress_sender.clone()))); // each task gets a copy of file_status_sender
       running = min(running + 1, concurrency);
 
       if running >= concurrency {
@@ -95,8 +95,8 @@ impl CoopWorkflow {
     };
 
     // Drop senders so the execution can complete
-    drop(tx);
-    drop(txp);
+    drop(file_status_sender);
+    drop(progress_sender);
 
     // Wait for any running tasks to complete
     while join_set.join_next().await.is_some() {}
