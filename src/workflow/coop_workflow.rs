@@ -2,7 +2,6 @@ use std::time::Instant;
 use std::cmp::{max, min};
 
 use indicatif::MultiProgress;
-use tokio::sync::broadcast::{self};
 use tokio::sync::mpsc::{self};
 use tokio::task::JoinSet;
 
@@ -11,7 +10,14 @@ use crate::cli::Args;
 use crate::console::{CoopConsole, UserResult};
 use crate::copy::{FileCopy, SourceFile};
 use crate::model::{FileStatus, InProgress};
-use crate::monitor::{OverallProgressMonitor, LifecycleEventMonitor, MonitorMux, FileInProgressMonitor};
+use crate::monitor::{
+  OverallProgressMonitor,
+  LifecycleEventMonitor,
+  MonitorMux,
+  FileInProgressMonitor,
+  FileStatusSender,
+  OverallProgressSender, InProgressSender
+};
 
 pub struct CoopWorkflow {
   args: Args
@@ -60,20 +66,20 @@ impl CoopWorkflow {
         .collect();
 
     // For low cardinality events
-    let (file_status_sender, file_status_receiver_1) = broadcast::channel::<FileStatus>(1000);
-    let file_status_receiver_2 = file_status_sender.subscribe();
+    let (lifecycle_event_sender, lifecycle_event_receiver) = mpsc::channel::<FileStatus>(1000);
+    let (overall_progress_sender, overall_progress_receiver) = mpsc::channel::<FileStatus>(1000);
 
     // For high cardinality events.
     // Allow up to 100,000 progress messages before blocking
     // Depending on the buffer size, the number of progress updates/s can be huge
-    let (progress_sender, progress_receiver) = mpsc::channel::<InProgress>(100000);
+    let (inprogress_sender, inprogress_receiver) = mpsc::channel::<InProgress>(100000);
 
-    let lifecycle_event_monitor_fut = LifecycleEventMonitor::monitor(file_status_receiver_1);
+    let lifecycle_event_monitor_fut = LifecycleEventMonitor::monitor(lifecycle_event_receiver);
 
     let overall_monitor = OverallProgressMonitor::new(&multi, copy_tasks.len() as u64);
-    let overall_monitor_fut = overall_monitor.monitor(file_status_receiver_2, Instant::now());
+    let overall_monitor_fut = overall_monitor.monitor(overall_progress_receiver, Instant::now());
 
-    let progress_monitor_fut = FileInProgressMonitor::monitor(progress_receiver);
+    let progress_monitor_fut = FileInProgressMonitor::monitor(inprogress_receiver);
 
     let mut join_set = JoinSet::new();
     // Start the monitors first, so we don't miss any messages
@@ -83,7 +89,16 @@ impl CoopWorkflow {
 
     let mut running = 0_u8;
     for task in copy_tasks {
-      join_set.spawn(task.copy(buffer_size.clone(), MonitorMux::new(file_status_sender.clone(), progress_sender.clone()))); // each task gets a copy of file_status_sender
+      join_set.spawn(
+        task.copy(
+          buffer_size.clone(),
+          MonitorMux::new(
+            FileStatusSender::new(lifecycle_event_sender.clone()),
+            OverallProgressSender::new(overall_progress_sender.clone()),
+            InProgressSender::new(inprogress_sender.clone())
+          )
+        )
+      );
       running = min(running + 1, concurrency);
 
       if running >= concurrency {
@@ -95,8 +110,9 @@ impl CoopWorkflow {
     };
 
     // Drop senders so the execution can complete
-    drop(file_status_sender);
-    drop(progress_sender);
+    drop(inprogress_sender);
+    drop(lifecycle_event_sender);
+    drop(overall_progress_sender);
 
     // Wait for any running tasks to complete
     while join_set.join_next().await.is_some() {}

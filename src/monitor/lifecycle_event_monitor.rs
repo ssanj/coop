@@ -1,5 +1,5 @@
-use tokio::sync::broadcast::Receiver;
-use crate::model::{R, FileStatus, FileType, FailedReason};
+use tokio::sync::mpsc::Receiver;
+use crate::model::{FileStatus, FileType, FailedReason, R};
 
 /// Monitors lifecyle events of all file copies in progress.
 pub struct LifecycleEventMonitor;
@@ -7,8 +7,8 @@ pub struct LifecycleEventMonitor;
 impl LifecycleEventMonitor {
 
    /// This is a low cardinality event receiver.
-   pub async fn monitor(mut rx: Receiver<FileStatus>) -> R<()> {
-      while let Ok(value) = rx.recv().await {
+   pub async fn monitor(mut rx: Receiver<FileStatus>) -> R<()>  {
+      while let Some(value) = rx.recv().await {
         match value {
           FileStatus::NotStarted(pb) => pb.set_status("waiting..."),
           FileStatus::OpenedSourceFile(pb) => pb.set_status("opened source file"),
@@ -75,7 +75,7 @@ impl LifecycleEventMonitor {
         }
       }
 
-      Ok(())
+    Ok(())
   }
 }
 

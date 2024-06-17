@@ -3,7 +3,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use tokio::sync::broadcast::Receiver;
+use tokio::sync::mpsc::Receiver;
 
 use crate::model::{CopyError, FailedReason, FileName, FileStatus, R};
 
@@ -86,7 +86,7 @@ impl OverallProgressMonitor {
       })
     };
 
-    while let Ok(value) = rx.recv().await {
+    while let Some(value) = rx.recv().await {
       match value {
         FileStatus::Success(file_name, _) => {
           self.handle_succeeded(file_name)

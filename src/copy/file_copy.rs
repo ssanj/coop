@@ -1,4 +1,3 @@
-use std::convert::identity;
 use std::path::{Path, PathBuf};
 use indicatif::MultiProgress;
 use tokio::fs::{DirBuilder, File};
@@ -6,7 +5,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::monitor::MonitorMux;
 use crate::progress::MyProgressBar;
-use crate::model::{FileType, SizeComparison, R};
+use crate::model::{FileType, SizeComparison, R, CopyError};
 use crate::args::BufferSize;
 use super::SourceFile;
 
@@ -45,7 +44,7 @@ impl FileCopy {
     progress_bar.set_prefix(self.source_file_name());
     let file_name = &self.source_file.file_name();
 
-    mux.send_not_started(progress_bar);
+    mux.send_not_started(progress_bar).await;
 
     let mut source_file = Self::open_source_file(&self.source_file.full_path(), &mux, progress_bar).await?;
     let file_size = Self::get_file_length(file_name, &source_file, FileType::Source, &mux, progress_bar).await?;
@@ -74,14 +73,14 @@ impl FileCopy {
     }
   }
 
-  async fn open_source_file<P: AsRef<Path>>(file: P, mux: &MonitorMux, progress_bar: &MyProgressBar) -> R<File> {
+  async fn open_source_file<P: AsRef<Path> + Clone>(file: P, mux: &MonitorMux, progress_bar: &MyProgressBar) -> R<File> {
       match File::open(file.as_ref()).await {
         Ok(file) => {
-          mux.send_opened_source_file(progress_bar);
+          mux.send_opened_source_file(progress_bar).await;
           Ok(file)
         },
         Err(e) => {
-          mux.send_could_not_read_source_file(file, e, progress_bar);
+          mux.send_could_not_read_source_file(file, <std::io::Error as Into<CopyError>>::into(e), progress_bar).await;
           Err(())
         }
       }
@@ -89,22 +88,22 @@ impl FileCopy {
 
   async fn get_file_length(file_name: &str, file: &File, file_type: FileType, mux: &MonitorMux, progress_bar: &MyProgressBar) -> R<u64> {
 
-    mux.send_getting_file_length(&file_type, progress_bar);
+    mux.send_getting_file_length(&file_type, progress_bar).await;
 
       match file.metadata().await {
         Ok(meta) => {
-          mux.send_got_file_length(&file_type, progress_bar);
+          mux.send_got_file_length(&file_type, progress_bar).await;
           Ok(meta.len())
         },
         Err(e) => {
-          mux.send_could_not_get_file_size(file_name, &file_type, e, progress_bar);
+          mux.send_could_not_get_file_size(file_name, &file_type, <std::io::Error as Into<CopyError>>::into(e), progress_bar).await;
           Err(())
         }
       }
   }
 
 
-  async fn create_destination_path<P: AsRef<Path>>(destination_file: P, mux: &MonitorMux, progress_bar: &MyProgressBar) -> R<()> {
+  async fn create_destination_path<P: AsRef<Path> + Clone>(destination_file: P, mux: &MonitorMux, progress_bar: &MyProgressBar) -> R<()> {
     if let Some(parent_path) = destination_file.as_ref().parent() {
     // check if it exists, if not create it
      if !parent_path.exists() {
@@ -115,7 +114,7 @@ impl FileCopy {
           .await;
 
         if let Err(e) = result {
-          mux.send_could_not_create_destination_directory(destination_file, e, progress_bar);
+          mux.send_could_not_create_destination_directory(destination_file, <std::io::Error as Into<CopyError>>::into(e), progress_bar).await;
           return Err(());
         }
      }
@@ -124,14 +123,14 @@ impl FileCopy {
     Ok(())
   }
 
-  async fn create_destination_file<P: AsRef<Path>>(destination_file: P, mux: &MonitorMux, progress_bar: &MyProgressBar) -> R<File> {
+  async fn create_destination_file<P: AsRef<Path> + Clone>(destination_file: P, mux: &MonitorMux, progress_bar: &MyProgressBar) -> R<File> {
     match File::create(destination_file.as_ref()).await {
       Ok(df) => {
-        mux.send_created_destination_file(progress_bar);
+        mux.send_created_destination_file(progress_bar).await;
         Ok(df)
       },
       Err(e) => {
-        mux.send_could_not_create_destination_file(destination_file, e, progress_bar);
+        mux.send_could_not_create_destination_file(destination_file, <std::io::Error as Into<CopyError>>::into(e), progress_bar).await;
         Err(())
       }
     }
@@ -146,7 +145,7 @@ impl FileCopy {
     match bytes_read_result {
       Ok(value) => Ok(value as u64),
       Err(e) => {
-        mux.send_read_failed(file, e, progress_bar);
+        mux.send_read_failed(file, <std::io::Error as Into<CopyError>>::into(e), progress_bar).await;
         Err(())
       }
     }
@@ -161,7 +160,7 @@ impl FileCopy {
     let bytes_written = match bytes_written_result {
       Ok(value) => value as u64,
       Err(e) => {
-        mux.send_write_to_destination_failed(file, e, progress_bar);
+        mux.send_write_to_destination_failed(file, <std::io::Error as Into<CopyError>>::into(e), progress_bar).await;
         return Err(())
       }
     };
@@ -173,12 +172,15 @@ impl FileCopy {
 
   async fn complete_file_copy(file: &str, destination_file: &mut File, file_size: u64, mux: &MonitorMux, progress_bar: &MyProgressBar, file_name: &str) -> R<()> {
 
-    mux.send_flushing_destination_file(progress_bar);
+    mux.send_flushing_destination_file(progress_bar).await;
     let flush_result = destination_file.flush().await;
 
-    flush_result.map_or_else(|e| mux.send_flushing_to_destination_file_failed(file, e, progress_bar), identity);
+    match flush_result {
+      Ok(_) => (),
+      Err(e) => mux.send_flushing_to_destination_file_failed(file, <std::io::Error as Into<CopyError>>::into(e), progress_bar).await,
+    }
 
-    mux.send_copy_complete(progress_bar);
+    mux.send_copy_complete(progress_bar).await;
 
     let dest_file_size = Self::get_file_length(file, destination_file, FileType::Destination, mux, progress_bar).await?;
 
@@ -191,17 +193,17 @@ impl FileCopy {
 
   async fn compare_file_sizes(file: &str, source_file_size: u64, destination_file_size: u64, mux: &MonitorMux, progress_bar: &MyProgressBar) -> R<()> {
     if source_file_size == destination_file_size {
-      mux.send_file_sizes_match(progress_bar)
+      mux.send_file_sizes_match(progress_bar).await
     } else {
       let size_comparison = SizeComparison::new(source_file_size, destination_file_size);
-      mux.send_files_sizes_are_different(file, size_comparison, progress_bar)
+      mux.send_files_sizes_are_different(file, size_comparison, progress_bar).await
     }
 
     Ok(())
   }
 
   async fn succeed(mux: &MonitorMux, progress_bar: &MyProgressBar, file_name: &str) -> R<()> {
-    mux.send_success(file_name, progress_bar);
+    mux.send_success(file_name, progress_bar).await;
     Ok(())
   }
 }
