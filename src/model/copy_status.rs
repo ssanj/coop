@@ -1,5 +1,6 @@
+use std::fmt;
 use std::path::Path;
-use crate::progress::MyProgressBar;
+use crate::{model::size_pretty, progress::MyProgressBar};
 
 #[derive(Debug, Clone)]
 pub enum FileStatus {
@@ -10,7 +11,7 @@ pub enum FileStatus {
   CreatedDestinationFile(MyProgressBar),
   CopyComplete(Complete),
   FileSizesMatch(MyProgressBar),
-  Success(FileName, MyProgressBar),
+  Success(FileName, FileSize, MyProgressBar),
   Failed(FailedReason),
   Flushing(MyProgressBar)
 }
@@ -33,6 +34,27 @@ impl <P: AsRef<Path>>From<P> for FileName {
     FileName(path.as_ref().file_name().map(|p| p.to_string_lossy().to_string()).unwrap_or("<unknown>".to_owned()))
   }
 }
+
+#[derive(Debug, Clone)]
+pub struct FileSize(u64);
+
+impl FileSize {
+  pub fn new(file_size: u64) -> Self {
+    Self(file_size)
+  }
+
+  #[allow(dead_code)]
+  pub fn size(self) -> u64 {
+    self.0
+  }
+}
+
+impl fmt::Display for FileSize {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", size_pretty(self.0))
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct CopyError(String);

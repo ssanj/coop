@@ -185,7 +185,7 @@ impl FileCopy {
     let dest_file_size = Self::get_file_length(file, destination_file, FileType::Destination, mux, progress_bar).await?;
 
     Self::compare_file_sizes(file, file_size, dest_file_size, mux, progress_bar).await?;
-    Self::succeed(mux, progress_bar, file_name).await?;
+    Self::succeed(mux, progress_bar, file_name, file_size).await?;
 
     Ok(())
   }
@@ -202,8 +202,8 @@ impl FileCopy {
     Ok(())
   }
 
-  async fn succeed(mux: &MonitorMux, progress_bar: &MyProgressBar, file_name: &str) -> R<()> {
-    mux.send_success(file_name, progress_bar).await;
+  async fn succeed(mux: &MonitorMux, progress_bar: &MyProgressBar, file_name: &str, file_size: u64) -> R<()> {
+    mux.send_success(file_name, file_size, progress_bar).await;
     Ok(())
   }
 }

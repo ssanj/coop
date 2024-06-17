@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::sync::mpsc::Receiver;
 
-use crate::model::{CopyError, FailedReason, FileName, FileStatus, R};
+use crate::model::{CopyError, FailedReason, FileName, FileSize, FileStatus, R};
 
 struct State {
   completed: u64,
@@ -88,8 +88,8 @@ impl OverallProgressMonitor {
 
     while let Some(value) = rx.recv().await {
       match value {
-        FileStatus::Success(file_name, _) => {
-          self.handle_succeeded(file_name)
+        FileStatus::Success(file_name, file_size, _) => {
+          self.handle_succeeded(file_name, file_size)
         },
 
         FileStatus::Failed(FailedReason::ReadFailed(file_name, error, _)) => self.handle_failed(file_name, error),
@@ -111,16 +111,16 @@ impl OverallProgressMonitor {
   }
 
 
-  fn handle_succeeded(&mut self, file: FileName) {
-    self.handle_end_state(|state| Self::insert_completed_bar(&file.name(), state))
+  fn handle_succeeded(&mut self, file: FileName, file_size: FileSize) {
+    self.handle_end_state(|state| Self::insert_completed_bar(&file.name(), file_size, state))
   }
 
   fn handle_failed(&mut self, file: FileName, error: CopyError) {
     self.handle_end_state(|state| Self::insert_failed_bar(&file.name(), &error.error(), state))
   }
 
-  fn insert_completed_bar(arg: &str, state: &mut MutexGuard<State>) {
-    Self::insert_bar(format!("{arg} ✅"), state)
+  fn insert_completed_bar(arg: &str, file_size: FileSize, state: &mut MutexGuard<State>) {
+    Self::insert_bar(format!("{arg} ({file_size}) ✅"), state)
   }
 
   fn insert_failed_bar(arg: &str, error: &str, state: &mut MutexGuard<State>) {
@@ -148,6 +148,5 @@ impl OverallProgressMonitor {
 
     update_completed_display(&mut state_guard)
   }
-
 }
 

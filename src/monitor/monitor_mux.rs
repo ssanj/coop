@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use tokio::sync::mpsc::{self};
 
-use crate::model::{Complete, CopyError, FailedReason, FileName, FileStatus, FileType, InProgress, SizeComparison};
+use crate::model::{Complete, CopyError, FailedReason, FileName, FileSize, FileStatus, FileType, InProgress, SizeComparison};
 use crate::progress::MyProgressBar;
 
 #[derive(Debug)]
@@ -284,9 +284,9 @@ impl MonitorMux {
       ).await;
   }
 
-  pub async fn send_success(&self, file_name: &str, progress_bar: &MyProgressBar) {
-    let _ = self.lifecycle_event_sender.send(FileStatus::Success(FileName::new(file_name), progress_bar.clone())).await;
-    let _ = self.overall_progress_sender.send(FileStatus::Success(FileName::new(file_name), progress_bar.clone())).await;
+  pub async fn send_success(&self, file_name: &str, file_size: u64, progress_bar: &MyProgressBar) {
+    let _ = self.lifecycle_event_sender.send(FileStatus::Success(FileName::new(file_name), FileSize::new(file_size), progress_bar.clone())).await;
+    let _ = self.overall_progress_sender.send(FileStatus::Success(FileName::new(file_name), FileSize::new(file_size), progress_bar.clone())).await;
   }
 
   pub async fn send_write_to_destination_failed<E : Into<CopyError> + Clone>(&self, file: &str, error: E, progress_bar: &MyProgressBar) {
