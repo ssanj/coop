@@ -15,7 +15,7 @@ use crate::monitor::{
   LifecycleEventMonitor,
   MonitorMux,
   FileInProgressMonitor,
-  FileStatusSender,
+  LifecycleEventSender,
   OverallProgressSender, InProgressSender
 };
 
@@ -93,9 +93,9 @@ impl CoopWorkflow {
         task.copy(
           buffer_size.clone(),
           MonitorMux::new(
-            FileStatusSender::new(lifecycle_event_sender.clone()),
-            OverallProgressSender::new(overall_progress_sender.clone()),
-            InProgressSender::new(inprogress_sender.clone())
+            InProgressSender::new(inprogress_sender.clone()),
+            LifecycleEventSender::new(lifecycle_event_sender.clone()),
+            OverallProgressSender::new(overall_progress_sender.clone())
           )
         )
       );

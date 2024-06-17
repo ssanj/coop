@@ -5,5 +5,5 @@ mod monitor_mux;
 
 pub use lifecycle_event_monitor::LifecycleEventMonitor;
 pub use overall_progress_monitor::OverallProgressMonitor;
-pub use monitor_mux::{MonitorMux, FileStatusSender, OverallProgressSender, InProgressSender};
+pub use monitor_mux::{MonitorMux, LifecycleEventSender, OverallProgressSender, InProgressSender};
 pub use file_inprogress_monitor::FileInProgressMonitor;
