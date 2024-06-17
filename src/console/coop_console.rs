@@ -26,9 +26,12 @@ impl CoopConsole {
     for (index, (file, size)) in files.iter().enumerate() {
       println!("  {:06} - {} ({})", index + 1, style(file).cyan(), style(Self::size_pretty(*size)).yellow())
     }
+
+    let total_size = files.iter().map(|(_, size)| *size).sum();
     println!("{}: {}", style("Concurrency").green(), concurrency);
     println!("{}: {}", style("Buffer size").green(), buffer_size);
     println!("{}: {}", style("Destination").green(), destination_dir);
+    println!("{}: {}", style("Total size").green(), Self::size_pretty(total_size));
 
     let options = ["no", "yes"];
 
