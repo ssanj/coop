@@ -11,12 +11,7 @@ use crate::console::{CoopConsole, UserResult};
 use crate::copy::{FileCopy, SourceFile};
 use crate::model::{FileStatus, InProgress};
 use crate::monitor::{
-  OverallProgressMonitor,
-  LifecycleEventMonitor,
-  MonitorMux,
-  FileInProgressMonitor,
-  LifecycleEventSender,
-  OverallProgressSender, InProgressSender
+  FileInProgressMonitor, InProgressSender, LifecycleEventMonitor, LifecycleEventSender, MonitorMux, NumFiles, OverallProgressMonitor, OverallProgressSender, TotalFileSize
 };
 
 pub struct CoopWorkflow {
@@ -59,6 +54,12 @@ impl CoopWorkflow {
 
     let multi = MultiProgress::new();
 
+    let total_file_sizes: u64 =
+      files_to_copy
+        .iter()
+        .map(|sf| sf.size())
+        .sum();
+
     let copy_tasks: Vec<_> =
       files_to_copy
         .into_iter()
@@ -76,7 +77,7 @@ impl CoopWorkflow {
 
     let lifecycle_event_monitor_fut = LifecycleEventMonitor::monitor(lifecycle_event_receiver);
 
-    let overall_monitor = OverallProgressMonitor::new(&multi, copy_tasks.len() as u64);
+    let overall_monitor = OverallProgressMonitor::new(&multi, NumFiles::new(copy_tasks.len() as u64), TotalFileSize::new(total_file_sizes));
     let overall_monitor_fut = overall_monitor.monitor(overall_progress_receiver, Instant::now());
 
     let progress_monitor_fut = FileInProgressMonitor::monitor(inprogress_receiver);

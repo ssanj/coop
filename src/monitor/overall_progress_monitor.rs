@@ -5,26 +5,44 @@ use std::time::{Duration, Instant};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::sync::mpsc::Receiver;
 
-use crate::model::{CopyError, FailedReason, FileName, FileSize, FileStatus, R};
+use crate::model::{size_pretty, CopyError, FailedReason, FileName, FileSize, FileStatus, R};
 
 struct State {
   completed: u64,
   completed_index: u64,
+  completed_bytes: u64,
   completed_item_bars: Vec<ProgressBar>,
+}
+
+pub struct NumFiles(u64);
+
+impl NumFiles {
+  pub fn new(num_files: u64) -> Self {
+    Self(num_files)
+  }
+}
+
+pub struct TotalFileSize(u64);
+
+impl TotalFileSize {
+  pub fn new(total_size: u64) -> Self {
+    Self(total_size)
+  }
 }
 
 /// Monitors the overall progress of all file copies in progress
 pub struct OverallProgressMonitor {
   progress: ProgressBar,
   items: u64,
+  total_bytes: u64,
   state: Mutex<State>,
 }
 
 impl OverallProgressMonitor {
 
-  pub fn new(multi: &MultiProgress, size: u64) -> Self {
+  pub fn new(multi: &MultiProgress, num_files: NumFiles, total_file_size: TotalFileSize) -> Self {
     let completed_item_bars =
-      (0..size)
+      (0..num_files.0)
       .map(|_| {
         let pb = Self::create_completed_progress_bar();
         multi.add(pb.clone())
@@ -35,7 +53,7 @@ impl OverallProgressMonitor {
       ProgressStyle::with_template("[{msg}] overall progress: {prefix} [{wide_bar:.green}]").unwrap();
 
     let overall_bar =
-      ProgressBar::new(size)
+      ProgressBar::new(num_files.0)
       .with_style(overall_bar)
       .with_finish(indicatif::ProgressFinish::Abandon);
 
@@ -47,13 +65,15 @@ impl OverallProgressMonitor {
         State {
           completed: 0,
           completed_index: 0,
+          completed_bytes: 0,
           completed_item_bars,
         }
       );
 
     Self {
       progress: overall_bar,
-      items: size,
+      items: num_files.0,
+      total_bytes: total_file_size.0,
       state
     }
   }
@@ -69,7 +89,7 @@ impl OverallProgressMonitor {
 
   /// This is a low cardinality event receiver.
   pub async fn monitor(mut self, mut rx: Receiver<FileStatus>, start_time: Instant) -> R<()> {
-    self.progress.set_prefix(format!("{}/{}", 0, self.items));
+    self.progress.set_prefix(format!("{}/{} (0/0)", 0, self.items));
     let timer_handle = {
       let pb = self.progress.clone();
       thread::spawn(move || {
@@ -112,11 +132,11 @@ impl OverallProgressMonitor {
 
 
   fn handle_succeeded(&mut self, file: FileName, file_size: FileSize) {
-    self.handle_end_state(|state| Self::insert_completed_bar(&file.name(), file_size, state))
+    self.handle_end_state(Some(file_size.clone()), |state| Self::insert_completed_bar(&file.name(), file_size, state))
   }
 
   fn handle_failed(&mut self, file: FileName, error: CopyError) {
-    self.handle_end_state(|state| Self::insert_failed_bar(&file.name(), &error.error(), state))
+    self.handle_end_state(None, |state| Self::insert_failed_bar(&file.name(), &error.error(), state))
   }
 
   fn insert_completed_bar(arg: &str, file_size: FileSize, state: &mut MutexGuard<State>) {
@@ -135,11 +155,14 @@ impl OverallProgressMonitor {
     }
   }
 
-  fn handle_end_state<F: FnOnce(&mut MutexGuard<State>)>(&mut self, update_completed_display: F) {
+  fn handle_end_state<F: FnOnce(&mut MutexGuard<State>)>(&mut self, maybe_file_size: Option<FileSize>, update_completed_display: F) {
     let mut state_guard = self.state.lock().unwrap();
     state_guard.completed += 1;
     self.progress.inc(1);
-    self.progress.set_prefix(format!("{}/{}", state_guard.completed, self.items));
+    if let Some(file_size) = maybe_file_size {
+      state_guard.completed_bytes += file_size.size()
+    }
+    self.progress.set_prefix(format!("{}/{} ({}/{})", state_guard.completed, self.items, size_pretty(state_guard.completed_bytes), size_pretty(self.total_bytes)));
 
     // If all items are completed, then finish
     if state_guard.completed >= self.items {
