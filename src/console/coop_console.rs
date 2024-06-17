@@ -13,7 +13,13 @@ pub enum UserResult {
 
 
 impl CoopConsole {
-  pub fn show_copy_state(files_to_copy: &[SourceFile], concurrency: u8, buffer_size: &BufferSize, destination_dir: &str) -> UserResult {
+  pub fn show_copy_state(
+    files_to_copy: &[SourceFile],
+    concurrency: u8,
+    buffer_size: &BufferSize,
+    destination_dir: &str,
+    total_file_size: u64
+  ) -> UserResult {
     let files: Vec<(String, u64)> =
       files_to_copy
         .iter()
@@ -25,11 +31,10 @@ impl CoopConsole {
       println!("  {:06} - {} ({})", index + 1, style(file).cyan(), style(size_pretty(*size)).yellow())
     }
 
-    let total_size = files.iter().map(|(_, size)| *size).sum();
     println!("{}: {}", style("Concurrency").green(), concurrency);
     println!("{}: {}", style("Buffer size").green(), buffer_size);
     println!("{}: {}", style("Destination").green(), destination_dir);
-    println!("{}: {}", style("Total size").green(), size_pretty(total_size));
+    println!("{}: {}", style("Total size").green(), size_pretty(total_file_size));
 
     let options = ["no", "yes"];
 

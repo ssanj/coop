@@ -37,13 +37,20 @@ impl CoopWorkflow {
 
     let files_to_copy = SourceFile::get_source_files(source, ignored_regexes);
 
+    let total_file_sizes: u64 =
+      files_to_copy
+        .iter()
+        .map(|sf| sf.size())
+        .sum();
+
     if !skip_verification {
       let selection =
         CoopConsole::show_copy_state(
           &files_to_copy,
           concurrency,
           &buffer_size,
-          destination_dir.to_str().unwrap_or("<Unknown>")
+          destination_dir.to_str().unwrap_or("<Unknown>"),
+          total_file_sizes
         );
 
       match selection {
@@ -53,12 +60,6 @@ impl CoopWorkflow {
     }
 
     let multi = MultiProgress::new();
-
-    let total_file_sizes: u64 =
-      files_to_copy
-        .iter()
-        .map(|sf| sf.size())
-        .sum();
 
     let copy_tasks: Vec<_> =
       files_to_copy
