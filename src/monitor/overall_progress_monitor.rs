@@ -1,4 +1,4 @@
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -11,6 +11,7 @@ struct State {
   completed: u64,
   completed_index: u64,
   completed_bytes: u64,
+  inprogress_bytes: u64,
   completed_item_bars: Vec<ProgressBar>,
 }
 
@@ -35,7 +36,7 @@ pub struct OverallProgressMonitor {
   progress: ProgressBar,
   items: u64,
   total_bytes: u64,
-  state: Mutex<State>,
+  state: Arc<Mutex<State>>,
 }
 
 impl OverallProgressMonitor {
@@ -61,13 +62,16 @@ impl OverallProgressMonitor {
     multi.add(overall_bar.clone());
 
     let state =
-      Mutex::new(
-        State {
-          completed: 0,
-          completed_index: 0,
-          completed_bytes: 0,
-          completed_item_bars,
-        }
+      Arc::new(
+        Mutex::new(
+          State {
+            completed: 0,
+            completed_index: 0,
+            completed_bytes: 0,
+            inprogress_bytes: 0,
+            completed_item_bars,
+          }
+        )
       );
 
     Self {
@@ -88,8 +92,8 @@ impl OverallProgressMonitor {
   }
 
   /// This is a low cardinality event receiver.
-  pub async fn monitor(mut self, mut rx: Receiver<FileStatus>, start_time: Instant) -> R<()> {
-    self.progress.set_prefix(format!("{}/{} (0/0)", 0, self.items));
+  pub async fn monitor(self, mut rx: Receiver<FileStatus>, start_time: Instant) -> R<()> {
+    self.progress.set_prefix(format!("0KB {}/{} (0/0)", 0, self.items));
     let timer_handle = {
       let pb = self.progress.clone();
       thread::spawn(move || {
@@ -106,6 +110,20 @@ impl OverallProgressMonitor {
       })
     };
 
+    let inprogress_handle = {
+      let pb = self.progress.clone();
+      let state = self.state.clone();
+      thread::spawn(move || {
+        while !pb.is_finished() {
+          let guard = state.lock().unwrap();
+          Self::set_progress(&guard, &pb, self.items, self.total_bytes);
+          drop(guard);
+          thread::sleep(Duration::from_millis(250));
+        }
+      })
+    };
+
+
     while let Some(value) = rx.recv().await {
       match value {
         FileStatus::Success(file_name, file_size, _) => {
@@ -120,22 +138,23 @@ impl OverallProgressMonitor {
         FileStatus::Failed(FailedReason::CouldNotCreateDestinationFile(file_name, error, _)) => self.handle_failed(file_name, error),
         FileStatus::Failed(FailedReason::CouldNotCreateDestinationDir(file_name, error, _)) => self.handle_failed(file_name, error),
         FileStatus::Failed(FailedReason::FileSizesAreDifferent(file_name, _, _)) => self.handle_failed(file_name, CopyError::new("File sizes are different")),
-
+        FileStatus::InProgress(bytes) => self.handle_inprogress(bytes),
         _ => ()
      }
     }
 
     let _ = timer_handle.join();
+    let _ = inprogress_handle.join();
 
     Ok(())
   }
 
 
-  fn handle_succeeded(&mut self, file: FileName, file_size: FileSize) {
+  fn handle_succeeded(&self, file: FileName, file_size: FileSize) {
     self.handle_end_state(Some(file_size.clone()), |state| Self::insert_completed_bar(&file.name(), file_size, state))
   }
 
-  fn handle_failed(&mut self, file: FileName, error: CopyError) {
+  fn handle_failed(&self, file: FileName, error: CopyError) {
     self.handle_end_state(None, |state| Self::insert_failed_bar(&file.name(), &error.error(), state))
   }
 
@@ -155,14 +174,15 @@ impl OverallProgressMonitor {
     }
   }
 
-  fn handle_end_state<F: FnOnce(&mut MutexGuard<State>)>(&mut self, maybe_file_size: Option<FileSize>, update_completed_display: F) {
+  fn handle_end_state<F: FnOnce(&mut MutexGuard<State>)>(&self, maybe_file_size: Option<FileSize>, update_completed_display: F) {
     let mut state_guard = self.state.lock().unwrap();
     state_guard.completed += 1;
     self.progress.inc(1);
     if let Some(file_size) = maybe_file_size {
       state_guard.completed_bytes += file_size.size()
     }
-    self.progress.set_prefix(format!("{}/{} ({}/{})", state_guard.completed, self.items, size_pretty(state_guard.completed_bytes), size_pretty(self.total_bytes)));
+    self.set_progress_(&state_guard);
+    // self.progress.set_prefix(format!("{} {}/{} ({}/{})", size_pretty(state_guard.inprogress_bytes), state_guard.completed, self.items, size_pretty(state_guard.completed_bytes), size_pretty(self.total_bytes)));
 
     // If all items are completed, then finish
     if state_guard.completed >= self.items {
@@ -170,6 +190,21 @@ impl OverallProgressMonitor {
     }
 
     update_completed_display(&mut state_guard)
+  }
+
+  fn handle_inprogress(&self, bytes: u64) {
+    let mut state_guard = self.state.lock().unwrap();
+    state_guard.inprogress_bytes += bytes;
+    drop(state_guard)
+  }
+
+  fn set_progress_(&self, state_guard: &MutexGuard<State>) {
+    Self::set_progress(state_guard, &self.progress, self.items, self.total_bytes)
+    // self.progress.set_prefix(format!("{} {}/{} ({}/{})", size_pretty(state_guard.inprogress_bytes), state_guard.completed, self.items, size_pretty(state_guard.completed_bytes), size_pretty(self.total_bytes)));
+  }
+
+  fn set_progress(state_guard: &MutexGuard<State>, pb: &ProgressBar, items: u64, total_bytes: u64) {
+    pb.set_prefix(format!("{} {}/{} ({}/{})", size_pretty(state_guard.inprogress_bytes), state_guard.completed, items, size_pretty(state_guard.completed_bytes), size_pretty(total_bytes)));
   }
 }
 

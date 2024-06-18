@@ -315,5 +315,7 @@ impl MonitorMux {
 
   pub async fn send_copy_in_progress(&self, bytes_written: u64, progress_bar: &MyProgressBar) {
     let _ = self.inprogress_sender.send(InProgress::new(bytes_written, progress_bar)).await;
+    // Only send this to the overall progress monitor
+    let _ = self.overall_progress_sender.send(FileStatus::InProgress(bytes_written)).await;
   }
 }

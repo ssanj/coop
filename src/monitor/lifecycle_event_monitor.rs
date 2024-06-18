@@ -72,6 +72,8 @@ impl LifecycleEventMonitor {
             pb.set_status("flushing destination to disk...");
             pb.set_error(&format!("❌ Flushing destination file failed: {}", reason.error()))
           },
+
+          FileStatus::InProgress(..) => ()
         }
       }
 

@@ -9,6 +9,7 @@ pub enum FileStatus {
   GotFileLength(FileType, MyProgressBar),
   GettingFileLength(FileType, MyProgressBar),
   CreatedDestinationFile(MyProgressBar),
+  InProgress(u64),
   CopyComplete(Complete),
   FileSizesMatch(MyProgressBar),
   Success(FileName, FileSize, MyProgressBar),
