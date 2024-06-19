@@ -33,7 +33,8 @@ impl TotalFileSize {
 
 /// Monitors the overall progress of all file copies in progress
 pub struct OverallProgressMonitor {
-  progress: ProgressBar,
+  overall_bar: ProgressBar,
+  stats_bar: ProgressBar,
   items: u64,
   total_bytes: u64,
   state: Arc<Mutex<State>>,
@@ -51,15 +52,24 @@ impl OverallProgressMonitor {
       .collect();
 
     let overall_bar =
-      ProgressStyle::with_template("[{msg}] overall progress: {prefix} [{wide_bar:.green}]").unwrap();
+      ProgressStyle::with_template("[{msg}] {prefix} [{wide_bar:.green}]").unwrap();
 
     let overall_bar =
       ProgressBar::new(num_files.0)
       .with_style(overall_bar)
       .with_finish(indicatif::ProgressFinish::Abandon);
 
+    let stats_bar_style =
+      ProgressStyle::with_template("{prefix}").unwrap();
+
+    let stats_bar =
+      ProgressBar::new(0)
+        .with_style(stats_bar_style)
+        .with_finish(indicatif::ProgressFinish::Abandon);
+
     // Add this at the end
     multi.add(overall_bar.clone());
+    multi.add(stats_bar.clone());
 
     let state =
       Arc::new(
@@ -75,7 +85,8 @@ impl OverallProgressMonitor {
       );
 
     Self {
-      progress: overall_bar,
+      overall_bar,
+      stats_bar,
       items: num_files.0,
       total_bytes: total_file_size.0,
       state
@@ -93,9 +104,15 @@ impl OverallProgressMonitor {
 
   /// This is a low cardinality event receiver.
   pub async fn monitor(self, mut rx: Receiver<FileStatus>, start_time: Instant) -> R<()> {
-    self.progress.set_prefix(format!("0KB {}/{} (0/0)", 0, self.items));
+    {
+      let state_guard = self.state.lock().unwrap();
+      self.set_progress(&state_guard);
+      Self::set_stats(&state_guard, &self.stats_bar, self.total_bytes);
+      drop(state_guard)
+    }
+
     let timer_handle = {
-      let pb = self.progress.clone();
+      let pb = self.overall_bar.clone();
       thread::spawn(move || {
         while !pb.is_finished() {
           let current_time = Instant::now();
@@ -111,12 +128,12 @@ impl OverallProgressMonitor {
     };
 
     let inprogress_handle = {
-      let pb = self.progress.clone();
+      let pb = self.stats_bar.clone();
       let state = self.state.clone();
       thread::spawn(move || {
         while !pb.is_finished() {
           let guard = state.lock().unwrap();
-          Self::set_progress(&guard, &pb, self.items, self.total_bytes);
+          Self::set_stats(&guard, &pb, self.total_bytes);
           drop(guard);
           thread::sleep(Duration::from_millis(250));
         }
@@ -177,15 +194,16 @@ impl OverallProgressMonitor {
   fn handle_end_state<F: FnOnce(&mut MutexGuard<State>)>(&self, maybe_file_size: Option<FileSize>, update_completed_display: F) {
     let mut state_guard = self.state.lock().unwrap();
     state_guard.completed += 1;
-    self.progress.inc(1);
+    self.overall_bar.inc(1);
     if let Some(file_size) = maybe_file_size {
       state_guard.completed_bytes += file_size.size()
     }
-    self.set_progress_(&state_guard);
+    self.set_progress(&state_guard);
+    Self::set_stats(&state_guard, &self.stats_bar, self.total_bytes);
 
     // If all items are completed, then finish
     if state_guard.completed >= self.items {
-      self.progress.finish();
+      self.overall_bar.finish();
     }
 
     update_completed_display(&mut state_guard)
@@ -197,12 +215,12 @@ impl OverallProgressMonitor {
     drop(state_guard)
   }
 
-  fn set_progress_(&self, state_guard: &MutexGuard<State>) {
-    Self::set_progress(state_guard, &self.progress, self.items, self.total_bytes)
+  fn set_progress(&self, state_guard: &MutexGuard<State>) {
+    self.overall_bar.set_prefix(format!("completed:{}/{}", state_guard.completed, self.items));
   }
 
-  fn set_progress(state_guard: &MutexGuard<State>, pb: &ProgressBar, items: u64, total_bytes: u64) {
-    pb.set_prefix(format!("{} {}/{} ({}/{})", size_pretty(state_guard.inprogress_bytes), state_guard.completed, items, size_pretty(state_guard.completed_bytes), size_pretty(total_bytes)));
+  fn set_stats(state_guard: &MutexGuard<State>, pb: &ProgressBar, total_bytes: u64) {
+    pb.set_prefix(format!("copied:{} files:({}/{}) speed:(???) etc:[???]", size_pretty(state_guard.inprogress_bytes), size_pretty(state_guard.completed_bytes), size_pretty(total_bytes)));
   }
 }
 

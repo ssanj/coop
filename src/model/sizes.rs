@@ -4,11 +4,11 @@ pub const GB: u64 = 1073741824;
 
 pub fn size_pretty(size: u64) -> String {
   if size >= GB {
-    format!("{:.2}GB", size as f64 / GB as f64)
+    format!("{:.2}GiB", size as f64 / GB as f64)
   } else if size >= MB {
-    format!("{:.2}MB", size as f64 / MB as f64)
+    format!("{:.2}MiB", size as f64 / MB as f64)
   } else if size >= KB {
-    format!("{:.2}KB", size as f64 / KB as f64)
+    format!("{:.2}KiB", size as f64 / KB as f64)
   } else {
     format!("{:.2}B", size)
   }
