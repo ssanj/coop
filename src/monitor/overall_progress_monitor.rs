@@ -182,7 +182,6 @@ impl OverallProgressMonitor {
       state_guard.completed_bytes += file_size.size()
     }
     self.set_progress_(&state_guard);
-    // self.progress.set_prefix(format!("{} {}/{} ({}/{})", size_pretty(state_guard.inprogress_bytes), state_guard.completed, self.items, size_pretty(state_guard.completed_bytes), size_pretty(self.total_bytes)));
 
     // If all items are completed, then finish
     if state_guard.completed >= self.items {
@@ -200,7 +199,6 @@ impl OverallProgressMonitor {
 
   fn set_progress_(&self, state_guard: &MutexGuard<State>) {
     Self::set_progress(state_guard, &self.progress, self.items, self.total_bytes)
-    // self.progress.set_prefix(format!("{} {}/{} ({}/{})", size_pretty(state_guard.inprogress_bytes), state_guard.completed, self.items, size_pretty(state_guard.completed_bytes), size_pretty(self.total_bytes)));
   }
 
   fn set_progress(state_guard: &MutexGuard<State>, pb: &ProgressBar, items: u64, total_bytes: u64) {
