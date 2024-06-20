@@ -38,6 +38,7 @@ pub struct OverallProgressMonitor {
   items: u64,
   total_bytes: u64,
   state: Arc<Mutex<State>>,
+  start_time: Option<Instant>
 }
 
 impl OverallProgressMonitor {
@@ -89,7 +90,8 @@ impl OverallProgressMonitor {
       stats_bar,
       items: num_files.0,
       total_bytes: total_file_size.0,
-      state
+      state,
+      start_time: None
     }
   }
 
@@ -103,11 +105,12 @@ impl OverallProgressMonitor {
   }
 
   /// This is a low cardinality event receiver.
-  pub async fn monitor(self, mut rx: Receiver<FileStatus>, start_time: Instant) -> R<()> {
+  pub async fn monitor(mut self, mut rx: Receiver<FileStatus>, start_time: Instant) -> R<()> {
+    self.start_time = Some(start_time); // Set the start time
     {
       let state_guard = self.state.lock().unwrap();
       self.set_progress(&state_guard);
-      Self::set_stats(&state_guard, &self.stats_bar, self.total_bytes);
+      Self::set_stats(&state_guard, &self.stats_bar, self.total_bytes, start_time);
       drop(state_guard)
     }
 
@@ -133,7 +136,7 @@ impl OverallProgressMonitor {
       thread::spawn(move || {
         while !pb.is_finished() {
           let guard = state.lock().unwrap();
-          Self::set_stats(&guard, &pb, self.total_bytes);
+          Self::set_stats(&guard, &pb, self.total_bytes, start_time);
           drop(guard);
           thread::sleep(Duration::from_millis(250));
         }
@@ -199,11 +202,12 @@ impl OverallProgressMonitor {
       state_guard.completed_bytes += file_size.size()
     }
     self.set_progress(&state_guard);
-    Self::set_stats(&state_guard, &self.stats_bar, self.total_bytes);
+    Self::set_stats(&state_guard, &self.stats_bar, self.total_bytes, self.start_time.unwrap());
 
     // If all items are completed, then finish
     if state_guard.completed >= self.items {
       self.overall_bar.finish();
+      self.stats_bar.finish();
     }
 
     update_completed_display(&mut state_guard)
@@ -219,8 +223,20 @@ impl OverallProgressMonitor {
     self.overall_bar.set_prefix(format!("completed:{}/{}", state_guard.completed, self.items));
   }
 
-  fn set_stats(state_guard: &MutexGuard<State>, pb: &ProgressBar, total_bytes: u64) {
-    pb.set_prefix(format!("copied:{} files:({}/{}) speed:(???) etc:[???]", size_pretty(state_guard.inprogress_bytes), size_pretty(state_guard.completed_bytes), size_pretty(total_bytes)));
+  fn set_stats(state_guard: &MutexGuard<State>, pb: &ProgressBar, total_bytes: u64, start_time: Instant) {
+    let elaped_time_seconds = start_time.elapsed().as_secs();
+
+    let speed =
+      if elaped_time_seconds == 0 {
+        0
+      } else {
+        state_guard.inprogress_bytes / elaped_time_seconds
+      };
+
+    let inprogress_bytes = size_pretty(state_guard.inprogress_bytes);
+    let completed_file_bytes = format!("({}/{})", size_pretty(state_guard.completed_bytes), size_pretty(total_bytes));
+    let speed = format!("({})", size_pretty(speed));
+    pb.set_prefix(format!("copied:{inprogress_bytes} files:{completed_file_bytes} speed:{speed} etc:[???]"));
   }
 }
 
