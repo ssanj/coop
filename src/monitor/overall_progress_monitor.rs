@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use chrono::TimeDelta;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::sync::mpsc::Receiver;
 
@@ -233,10 +234,46 @@ impl OverallProgressMonitor {
         state_guard.inprogress_bytes / elaped_time_seconds
       };
 
-    let inprogress_bytes = size_pretty(state_guard.inprogress_bytes);
-    let completed_file_bytes = format!("({}/{})", size_pretty(state_guard.completed_bytes), size_pretty(total_bytes));
-    let speed = format!("({})", size_pretty(speed));
-    pb.set_prefix(format!("copied:{inprogress_bytes} files:{completed_file_bytes} speed:{speed} etc:[???]"));
+    let remaining_bytes = total_bytes - state_guard.inprogress_bytes;
+    let estimated_completion_time =
+      if speed > 0 {
+        let seconds_remaining = remaining_bytes / speed; // bytes/second
+        use chrono::prelude::*;
+
+        let local_now = Local::now();
+        let delta = TimeDelta::from_std(Duration::from_secs(seconds_remaining)).unwrap();
+        let estimated_completion_time = local_now + delta;
+        estimated_completion_time.format("%H:%M:%S").to_string()
+      } else {
+        "00:00:00".to_owned()
+      };
+
+      let duration =
+        if speed > 0 {
+          let seconds_remaining = remaining_bytes / speed; // bytes/second
+          let current = Instant::now();
+          let end_time = current.checked_add(Duration::from_secs(seconds_remaining)).unwrap();
+
+          let estimated_duration = end_time.duration_since(start_time);
+          let seconds = estimated_duration.as_secs();
+          let minutes = seconds / 60;
+          let hours = minutes / 60;
+          format!("{:02}:{:02}:{:02}", hours, minutes % 60, seconds % 60)
+        } else {
+          "00:00:00".to_owned()
+        };
+
+    pb.set_prefix(
+      format!(
+        "copied:{} files:({}/{}) speed:({}) completes:[{}] takes:[{}]",
+        size_pretty(state_guard.inprogress_bytes),
+        size_pretty(state_guard.completed_bytes),
+        size_pretty(total_bytes),
+        size_pretty(speed),
+        estimated_completion_time,
+        duration
+      )
+    );
   }
 }
 
