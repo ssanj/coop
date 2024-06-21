@@ -2,7 +2,7 @@
 
 Visualise progress on your network file copy
 
-![Coop](coop.png)
+![Coop](coop.gif)
 
 ## Usage
 
