@@ -5,7 +5,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::monitor::MonitorMux;
 use crate::progress::MyProgressBar;
-use crate::model::{FileType, SizeComparison, R, CopyError};
+use crate::model::{SizeComparison, R, CopyError};
 use crate::args::BufferSize;
 use super::SourceFile;
 
@@ -47,7 +47,7 @@ impl FileCopy {
     mux.send_not_started(progress_bar).await;
 
     let mut source_file = Self::open_source_file(&self.source_file.full_path(), &mux, progress_bar).await?;
-    let file_size = Self::get_file_length(file_name, &source_file, FileType::Source, &mux, progress_bar).await?;
+    let file_size = self.source_file.size();
     Self::create_destination_path(&self.destination_file(), &mux, progress_bar).await?;
     let mut destination_file = Self::create_destination_file(&self.destination_file(), &mux, progress_bar).await?;
 
@@ -86,17 +86,17 @@ impl FileCopy {
       }
   }
 
-  async fn get_file_length(file_name: &str, file: &File, file_type: FileType, mux: &MonitorMux, progress_bar: &MyProgressBar) -> R<u64> {
+  async fn get_destination_file_length(file_name: &str, file: &File, mux: &MonitorMux, progress_bar: &MyProgressBar) -> R<u64> {
 
-    mux.send_getting_file_length(&file_type, progress_bar).await;
+    mux.send_getting_file_length(progress_bar).await;
 
       match file.metadata().await {
         Ok(meta) => {
-          mux.send_got_file_length(&file_type, progress_bar).await;
+          mux.send_got_file_length(progress_bar).await;
           Ok(meta.len())
         },
         Err(e) => {
-          mux.send_could_not_get_file_size(file_name, &file_type, <std::io::Error as Into<CopyError>>::into(e), progress_bar).await;
+          mux.send_could_not_get_destination_file_size(file_name, <std::io::Error as Into<CopyError>>::into(e), progress_bar).await;
           Err(())
         }
       }
@@ -182,7 +182,7 @@ impl FileCopy {
 
     mux.send_copy_complete(progress_bar).await;
 
-    let dest_file_size = Self::get_file_length(file, destination_file, FileType::Destination, mux, progress_bar).await?;
+    let dest_file_size = Self::get_destination_file_length(file, destination_file, mux, progress_bar).await?;
 
     Self::compare_file_sizes(file, file_size, dest_file_size, mux, progress_bar).await?;
     Self::succeed(mux, progress_bar, file_name, file_size).await?;

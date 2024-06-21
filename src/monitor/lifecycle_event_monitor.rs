@@ -1,5 +1,5 @@
 use tokio::sync::mpsc::Receiver;
-use crate::model::{FileStatus, FileType, FailedReason, R};
+use crate::model::{FileStatus, FailedReason, R};
 
 /// Monitors lifecyle events of all file copies in progress.
 pub struct LifecycleEventMonitor;
@@ -12,10 +12,8 @@ impl LifecycleEventMonitor {
         match value {
           FileStatus::NotStarted(pb) => pb.set_status("waiting..."),
           FileStatus::OpenedSourceFile(pb) => pb.set_status("opened source file"),
-          FileStatus::GettingFileLength(FileType::Source, pb) => pb.set_status("getting source file length"),
-          FileStatus::GotFileLength(FileType::Source, pb) => pb.set_status("calculated source file length"),
-          FileStatus::GettingFileLength(FileType::Destination, pb) => pb.set_status("getting destination file length"),
-          FileStatus::GotFileLength(FileType::Destination, pb) => pb.set_status("calculated destination file length"),
+          FileStatus::GettingDestinationFileLength(pb) => pb.set_status("getting destination file length"),
+          FileStatus::GotDestinationFileLength(pb) => pb.set_status("calculated destination file length"),
           FileStatus::CreatedDestinationFile(pb) => pb.set_status("created destination file"),
           FileStatus::Flushing(pb) => pb.set_status("flushing destination..."),
 
@@ -38,12 +36,7 @@ impl LifecycleEventMonitor {
             pb.set_error(&format!("❌ Write failed: {}", reason.message()))
           },
 
-          FileStatus::Failed(FailedReason::CouldNotGetFileSize(_, reason, FileType::Source, pb)) => {
-            pb.set_status("calculating source file length...");
-            pb.set_error(&format!("❌ Could not get source file size: {}", reason.error()))
-          },
-
-          FileStatus::Failed(FailedReason::CouldNotGetFileSize(_, reason, FileType::Destination, pb)) => {
+          FileStatus::Failed(FailedReason::CouldNotGetDestinationFileSize(_, reason, pb)) => {
             pb.set_status("calculating destination file length...");
             pb.set_error(&format!("❌ Could not get destination file size: {}", reason.error()))
           },

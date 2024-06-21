@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use tokio::sync::mpsc::{self};
 
-use crate::model::{Complete, CopyError, FailedReason, FileName, FileSize, FileStatus, FileType, InProgress, SizeComparison};
+use crate::model::{Complete, CopyError, FailedReason, FileName, FileSize, FileStatus, InProgress, SizeComparison};
 use crate::progress::MyProgressBar;
 
 #[derive(Debug)]
@@ -109,23 +109,22 @@ impl MonitorMux {
       ).await;
   }
 
-  pub async fn send_getting_file_length(&self, file_type: &FileType, progress_bar: &MyProgressBar) {
-    let _ = self.lifecycle_event_sender.send(FileStatus::GettingFileLength(file_type.clone(), progress_bar.clone())).await;
-    let _ = self.overall_progress_sender.send(FileStatus::GettingFileLength(file_type.clone(), progress_bar.clone())).await;
+  pub async fn send_getting_file_length(&self, progress_bar: &MyProgressBar) {
+    let _ = self.lifecycle_event_sender.send(FileStatus::GettingDestinationFileLength(progress_bar.clone())).await;
+    let _ = self.overall_progress_sender.send(FileStatus::GettingDestinationFileLength(progress_bar.clone())).await;
   }
 
-  pub async fn send_got_file_length(&self, file_type: &FileType, progress_bar: &MyProgressBar) {
-    let _ = self.lifecycle_event_sender.send(FileStatus::GotFileLength(file_type.clone(), progress_bar.clone())).await;
-    let _ = self.overall_progress_sender.send(FileStatus::GotFileLength(file_type.clone(), progress_bar.clone())).await;
+  pub async fn send_got_file_length(&self, progress_bar: &MyProgressBar) {
+    let _ = self.lifecycle_event_sender.send(FileStatus::GotDestinationFileLength(progress_bar.clone())).await;
+    let _ = self.overall_progress_sender.send(FileStatus::GotDestinationFileLength(progress_bar.clone())).await;
   }
 
-  pub async fn send_could_not_get_file_size<E: Into<CopyError> + Clone>(&self, file_name: &str, file_type: &FileType, error: E, progress_bar: &MyProgressBar) {
+  pub async fn send_could_not_get_destination_file_size<E: Into<CopyError> + Clone>(&self, file_name: &str, error: E, progress_bar: &MyProgressBar) {
     let _ = self.lifecycle_event_sender.send(
       FileStatus::Failed(
-        FailedReason::CouldNotGetFileSize(
+        FailedReason::CouldNotGetDestinationFileSize(
           FileName::new(file_name),
           error.clone().into(),
-          file_type.clone(),
           progress_bar.clone()
         )
       )
@@ -133,10 +132,9 @@ impl MonitorMux {
 
     let _ = self.overall_progress_sender.send(
       FileStatus::Failed(
-        FailedReason::CouldNotGetFileSize(
+        FailedReason::CouldNotGetDestinationFileSize(
           FileName::new(file_name),
           error.into(),
-          file_type.clone(),
           progress_bar.clone()
         )
       )

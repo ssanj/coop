@@ -6,8 +6,8 @@ use crate::{model::size_pretty, progress::MyProgressBar};
 pub enum FileStatus {
   NotStarted(MyProgressBar),
   OpenedSourceFile(MyProgressBar),
-  GotFileLength(FileType, MyProgressBar),
-  GettingFileLength(FileType, MyProgressBar),
+  GotDestinationFileLength(MyProgressBar),
+  GettingDestinationFileLength(MyProgressBar),
   CreatedDestinationFile(MyProgressBar),
   InProgress(u64),
   CopyComplete(Complete),
@@ -125,12 +125,6 @@ impl Complete {
 }
 
 #[derive(Debug, Clone)]
-pub enum FileType {
-  Source,
-  Destination,
-}
-
-#[derive(Debug, Clone)]
 struct SouceSize(u64);
 
 #[derive(Debug, Clone)]
@@ -166,7 +160,7 @@ pub enum FailedReason {
   WriteFailed(FileName, CopyError, MyProgressBar),
   FlushFailed(FileName, CopyError, MyProgressBar),
   CouldNotReadSourceFile(FileName, CopyError, MyProgressBar),
-  CouldNotGetFileSize(FileName, CopyError, FileType, MyProgressBar),
+  CouldNotGetDestinationFileSize(FileName, CopyError, MyProgressBar),
   CouldNotCreateDestinationFile(FileName, CopyError, MyProgressBar),
   CouldNotCreateDestinationDir(FileName, CopyError, MyProgressBar),
   FileSizesAreDifferent(FileName, SizeComparison, MyProgressBar),
