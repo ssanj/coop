@@ -1,3 +1,5 @@
+use std::fs::{File, OpenOptions};
+use std::io::Write;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -6,14 +8,15 @@ use chrono::TimeDelta;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::sync::mpsc::Receiver;
 
-use crate::model::{size_pretty, CopyError, FailedReason, FileName, FileSize, FileStatus, R};
+use crate::model::{size_pretty, CoopError, CopyError, FailedReason, FileName, FileSize, FileStatus, R};
 
 struct State {
   completed: u64,
-  completed_index: u64,
   completed_bytes: u64,
   inprogress_bytes: u64,
-  completed_item_bars: Vec<ProgressBar>,
+  log: File,
+  error_bar: ProgressBar,
+  errors: Vec<String>,
 }
 
 pub struct NumFiles(u64);
@@ -44,21 +47,13 @@ pub struct OverallProgressMonitor {
 
 impl OverallProgressMonitor {
 
-  pub fn new(multi: &MultiProgress, num_files: NumFiles, total_file_size: TotalFileSize) -> Self {
-    let completed_item_bars =
-      (0..num_files.0)
-      .map(|_| {
-        let pb = Self::create_completed_progress_bar();
-        multi.add(pb.clone())
-      })
-      .collect();
-
-    let overall_bar =
+  pub fn new(multi: &MultiProgress, num_files: NumFiles, total_file_size: TotalFileSize) -> Result<Self, CoopError> {
+    let overall_bar_style =
       ProgressStyle::with_template("[{msg}] {prefix} [{wide_bar:.green}]").unwrap();
 
     let overall_bar =
       ProgressBar::new(num_files.0)
-      .with_style(overall_bar)
+      .with_style(overall_bar_style)
       .with_finish(indicatif::ProgressFinish::Abandon);
 
     let stats_bar_style =
@@ -69,41 +64,57 @@ impl OverallProgressMonitor {
         .with_style(stats_bar_style)
         .with_finish(indicatif::ProgressFinish::Abandon);
 
+    let error_bar_style =
+      ProgressStyle::with_template("{prefix}").unwrap();
+
+
+    let error_bar =
+      ProgressBar::new(num_files.0)
+      .with_style(error_bar_style)
+      .with_finish(indicatif::ProgressFinish::Abandon);
+
+    multi.add(error_bar.clone());
+
     // Add this at the end
     multi.add(overall_bar.clone());
     multi.add(stats_bar.clone());
+
+    // Remove the file if it exists
+    let _ = std::fs::remove_file("coop.log");
+
+    let log: File =
+      OpenOptions::new()
+        .create_new(true)
+        .append(true)
+        .open("coop.log")
+        .map_err(|e| CoopError::CouldNotOpenLogFile(e.to_string()))?;
 
     let state =
       Arc::new(
         Mutex::new(
           State {
             completed: 0,
-            completed_index: 0,
             completed_bytes: 0,
             inprogress_bytes: 0,
-            completed_item_bars,
+            log,
+            error_bar,
+            errors: vec![]
           }
         )
       );
 
-    Self {
-      overall_bar,
-      stats_bar,
-      items: num_files.0,
-      total_bytes: total_file_size.0,
-      state,
-      start_time: None
-    }
+    Ok(
+      Self {
+        overall_bar,
+        stats_bar,
+        items: num_files.0,
+        total_bytes: total_file_size.0,
+        state,
+        start_time: None
+      }
+    )
   }
 
-  fn create_completed_progress_bar() -> ProgressBar {
-    let completed_bar_style =
-      ProgressStyle::with_template("{prefix}").unwrap();
-
-    ProgressBar::new(1)
-    .with_style(completed_bar_style)
-    .with_finish(indicatif::ProgressFinish::Abandon)
-  }
 
   /// This is a low cardinality event receiver.
   pub async fn monitor(mut self, mut rx: Receiver<FileStatus>, start_time: Instant) -> R<()> {
@@ -180,19 +191,21 @@ impl OverallProgressMonitor {
   }
 
   fn insert_completed_bar(arg: &str, file_size: FileSize, state: &mut MutexGuard<State>) {
-    Self::insert_bar(format!("{arg} ({file_size}) ✅"), state)
+    Self::log(format!("{arg} ({file_size}) ✅"), state)
   }
 
   fn insert_failed_bar(arg: &str, error: &str, state: &mut MutexGuard<State>) {
-    Self::insert_bar(format!("{arg} ({}) ❌", error), state)
+    let errors = &mut state.errors;
+    let error_string = format!("{arg} ({}) ❌", error);
+    errors.push(error_string.clone());
+    state.error_bar.clone().with_prefix(state.errors.join("\n"));
+    Self::log(error_string, state)
   }
 
-  fn insert_bar(arg: String, state: &mut MutexGuard<State>) {
-    let current_index = state.completed_index;
-    if let Some(pb) = state.completed_item_bars.get(current_index as usize) {
-      pb.set_prefix(arg);
-      state.completed_index += 1;
-    }
+  fn log(arg: String, state: &mut MutexGuard<State>) {
+    let mut log = &state.log;
+    let buf = format!("{arg}\n");
+    let _ = log.write(buf.as_bytes()).unwrap();
   }
 
   fn handle_end_state<F: FnOnce(&mut MutexGuard<State>)>(&self, maybe_file_size: Option<FileSize>, update_completed_display: F) {

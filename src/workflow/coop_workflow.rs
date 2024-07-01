@@ -61,6 +61,9 @@ impl CoopWorkflow {
 
     let multi = MultiProgress::new();
 
+    // This should fix the flickering after 0.17.8+
+    multi.set_move_cursor(true);
+
     let copy_tasks: Vec<_> =
       files_to_copy
         .into_iter()
@@ -78,7 +81,10 @@ impl CoopWorkflow {
 
     let lifecycle_event_monitor_fut = LifecycleEventMonitor::monitor(lifecycle_event_receiver);
 
-    let overall_monitor = OverallProgressMonitor::new(&multi, NumFiles::new(copy_tasks.len() as u64), TotalFileSize::new(total_file_sizes));
+    let overall_monitor =
+      OverallProgressMonitor::new(&multi, NumFiles::new(copy_tasks.len() as u64), TotalFileSize::new(total_file_sizes))
+        .unwrap_or_else(|e| panic!("{e}"));
+
     let overall_monitor_fut = overall_monitor.monitor(overall_progress_receiver, Instant::now());
 
     let progress_monitor_fut = FileInProgressMonitor::monitor(inprogress_receiver);
@@ -118,5 +124,7 @@ impl CoopWorkflow {
 
     // Wait for any running tasks to complete
     while join_set.join_next().await.is_some() {}
+
+    println!("See coop.log for the file list")
   }
 }
