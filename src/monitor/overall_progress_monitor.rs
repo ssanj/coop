@@ -256,9 +256,9 @@ impl OverallProgressMonitor {
         let local_now = Local::now();
         let delta = TimeDelta::from_std(Duration::from_secs(seconds_remaining)).unwrap();
         let estimated_completion_time = local_now + delta;
-        estimated_completion_time.format("%H:%M:%S").to_string()
+        estimated_completion_time.format("%I:%M:%S%p").to_string()
       } else {
-        "00:00:00".to_owned()
+        "00:00:00--".to_owned()
       };
 
       let duration =
@@ -272,19 +272,19 @@ impl OverallProgressMonitor {
           let minutes = seconds / 60;
           let hours = minutes / 60;
           if hours > 0 {
-            format!("{:>11}", format!("{:2}h {:2}m {:2}s", hours, minutes % 60, seconds % 60))
+            format!("{:02}h {:02}m {:02}s", hours, minutes % 60, seconds % 60)
           } else if minutes > 0 {
-            format!("{:>11}", format!("{:2}m {:2}s", minutes % 60, seconds % 60))
+            format!("{:02}m {:02}s", minutes % 60, seconds % 60)
           } else {
-            format!("{:>11}", format!("{:2}s", seconds % 60))
+            format!("{:02}s", seconds % 60)
           }
         } else {
-          format!("{:^11}", "???".to_owned())
+          format!("{:^11}", "00h 00m 00s".to_owned())
         };
 
     pb.set_prefix(
       format!(
-        "copied:{} files:({}/{}) speed:({}) completes:[{}] takes:[{}]",
+        "copied:{} files:({}/{}) speed:({}) done:({}) takes:({})",
         size_pretty(state_guard.inprogress_bytes),
         size_pretty(state_guard.completed_bytes),
         size_pretty(total_bytes),
