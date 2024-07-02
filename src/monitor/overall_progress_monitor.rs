@@ -271,9 +271,15 @@ impl OverallProgressMonitor {
           let seconds = estimated_duration.as_secs();
           let minutes = seconds / 60;
           let hours = minutes / 60;
-          format!("{:02}:{:02}:{:02}", hours, minutes % 60, seconds % 60)
+          if hours > 0 {
+            format!("{:>11}", format!("{:2}h {:2}m {:2}s", hours, minutes % 60, seconds % 60))
+          } else if minutes > 0 {
+            format!("{:>11}", format!("{:2}m {:2}s", minutes % 60, seconds % 60))
+          } else {
+            format!("{:>11}", format!("{:2}s", seconds % 60))
+          }
         } else {
-          "00:00:00".to_owned()
+          format!("{:^11}", "???".to_owned())
         };
 
     pb.set_prefix(
