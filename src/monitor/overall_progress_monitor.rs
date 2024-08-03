@@ -49,7 +49,7 @@ impl OverallProgressMonitor {
 
   pub fn new(multi: &MultiProgress, num_files: NumFiles, total_file_size: TotalFileSize) -> Result<Self, CoopError> {
     let overall_bar_style =
-      ProgressStyle::with_template("[{msg}] {prefix} [{wide_bar:.green}]").unwrap();
+      ProgressStyle::with_template("[{msg}] {prefix} [{bar:.green}]").unwrap();
 
     let overall_bar =
       ProgressBar::new(num_files.0)
@@ -137,7 +137,7 @@ impl OverallProgressMonitor {
           let minutes = seconds / 60;
           let hours = minutes / 60;
           pb.set_message(format!("{:02}:{:02}:{:02}.{:03}", hours, minutes % 60, seconds % 60, millis % 1000));
-          thread::sleep(Duration::from_millis(250));
+          thread::sleep(Duration::from_secs(1));
         }
       })
     };
@@ -150,7 +150,7 @@ impl OverallProgressMonitor {
           let guard = state.lock().unwrap();
           Self::set_stats(&guard, &pb, self.total_bytes, start_time);
           drop(guard);
-          thread::sleep(Duration::from_millis(250));
+          thread::sleep(Duration::from_secs(1));
         }
       })
     };

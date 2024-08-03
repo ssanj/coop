@@ -61,9 +61,6 @@ impl CoopWorkflow {
 
     let multi = MultiProgress::new();
 
-    // This should fix the flickering after 0.17.8+
-    multi.set_move_cursor(true);
-
     let copy_tasks: Vec<_> =
       files_to_copy
         .into_iter()

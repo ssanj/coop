@@ -1,16 +1,15 @@
-use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
+use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 
 #[derive(Debug, Clone)]
 pub struct MyProgressBar {
   primary: ProgressBar,
   secondary: ProgressBar,
   error: ProgressBar,
-  separator: ProgressBar,
 }
 
 impl MyProgressBar {
   pub fn new(multi: &MultiProgress) -> Self {
-    let primary_style = ProgressStyle::with_template("[{wide_bar:.green}] {bytes:.green}/{total_bytes} ({bytes_per_sec}, {eta})").unwrap();
+    let primary_style = ProgressStyle::with_template("[{bar:.green}] {bytes:.green}/{total_bytes} ({bytes_per_sec})").unwrap();
     let primary =
       ProgressBar::new(0)
       .with_style(primary_style)
@@ -28,21 +27,21 @@ impl MyProgressBar {
         .with_style(error_style)
         .with_finish(indicatif::ProgressFinish::AndClear);
 
-    let separator =
-      ProgressBar::new(10)
-        .with_style(ProgressStyle::with_template("{wide_bar:.blue}").unwrap().progress_chars("--"))
-        .with_finish(indicatif::ProgressFinish::AndClear);
+    // Update once a second (but bursting to up to 20 - Indicatif default)
+    // To reduce flickering, it would be good to reduce this to every few seconds
+    // Wait for indicatif to merge this PR: https://github.com/console-rs/indicatif/pull/487
+    primary.set_draw_target(ProgressDrawTarget::stderr_with_hz(1));
+    secondary.set_draw_target(ProgressDrawTarget::stderr_with_hz(1));
+    error.set_draw_target(ProgressDrawTarget::stderr_with_hz(1));
 
     multi.add(primary.clone());
     multi.add(secondary.clone());
     multi.add(error.clone());
-    multi.add(separator.clone());
 
     Self {
       primary,
       secondary,
       error,
-      separator,
     }
   }
 
@@ -54,7 +53,6 @@ impl MyProgressBar {
     self.primary.tick();
     self.secondary.tick();
     self.error.tick();
-    self.separator.tick();
   }
 
   pub fn set_error(&self, msg: &str) {
@@ -83,6 +81,5 @@ impl MyProgressBar {
     self.primary.finish_and_clear();
     self.secondary.finish_and_clear();
     self.error.finish_and_clear();
-    self.separator.finish_and_clear();
   }
 }
