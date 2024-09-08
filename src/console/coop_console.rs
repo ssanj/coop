@@ -24,6 +24,7 @@ impl CoopConsole {
       files_to_copy
         .iter()
         .map(|sf| (sf.relative_path().clone(), sf.size()))
+        .take(50)
         .collect();
 
     println!("{}:", style("Source files").green());
@@ -31,9 +32,17 @@ impl CoopConsole {
       println!("  {:06} - {} ({})", index + 1, style(file).cyan(), style(size_pretty(*size)).yellow())
     }
 
+    let num_files = files_to_copy.len();
+    let displayed_num_files = files.len();
+
+    if num_files > displayed_num_files {
+      println!(" + ({})", num_files - displayed_num_files)
+    }
+
     println!("{}: {}", style("Concurrency").green(), concurrency);
     println!("{}: {}", style("Buffer size").green(), buffer_size);
     println!("{}: {}", style("Destination").green(), destination_dir);
+    println!("{}: {}", style("Files").green(), num_files);
     println!("{}: {}", style("Total size").green(), size_pretty(total_file_size));
 
     let options = ["no", "yes"];
