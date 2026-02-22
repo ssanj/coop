@@ -38,7 +38,7 @@ pub struct Args {
    /// Example: --ignore '.git'
    ///
    /// Note: When ignores are supplied the defaults are not used.
-   #[arg(short, long, default_values=[".DS_Store", ".git", "/target"])]
+   #[arg(short, long, default_values=[".DS_Store", ".git/", "/target"])]
    pub ignore: Vec<Regex>,
 
    /// Skip asking verification on copy
